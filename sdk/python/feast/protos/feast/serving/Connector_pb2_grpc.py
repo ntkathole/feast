@@ -5,7 +5,7 @@ import warnings
 
 from feast.protos.feast.serving import Connector_pb2 as feast_dot_serving_dot_Connector__pb2
 
-GRPC_GENERATED_VERSION = '1.71.0'
+GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 

@@ -506,6 +506,15 @@ class MilvusOnlineStore(OnlineStore):
         if not config.online_store.vector_enabled:
             raise ValueError("Vector search is not enabled in the online store config")
 
+        if config.online_store.vector_enabled:
+            vector_fields = [
+                f for f in table.features if getattr(f, "vector_index", False)
+            ]
+            if not vector_fields:
+                raise ValueError(
+                    f"Vector search is enabled, but no fields in FeatureView '{table.name}' have vector_index=True"
+                )
+
         if embedding is None and query_string is None:
             raise ValueError("Either embedding or query_string must be provided")
 
@@ -526,13 +535,19 @@ class MilvusOnlineStore(OnlineStore):
         # Find the vector search field if we need it
         ann_search_field = None
         if embedding is not None:
-            for field in collection["fields"]:
-                if (
-                    field["type"] in [DataType.FLOAT_VECTOR, DataType.BINARY_VECTOR]
-                    and field["name"] in output_fields
-                ):
-                    ann_search_field = field["name"]
-                    break
+            vector_fields = [
+                f for f in table.features if getattr(f, "vector_index", False)
+            ]
+            if len(vector_fields) > 1:
+                raise ValueError(
+                    f"Multiple vector fields found in FeatureView '{table.name}'. "
+                    "Please specify which one to use for ANN search."
+                )
+            elif not vector_fields:
+                raise ValueError(
+                    f"No vector fields with vector_index=True found in FeatureView '{table.name}'"
+                )
+            ann_search_field = vector_fields[0].name
 
         self.client.load_collection(collection_name)
 

@@ -18,7 +18,7 @@ from feast.protos.feast.core import ValidationProfile_pb2 as feast_dot_core_dot_
 from feast.protos.feast.registry import RegistryServer_pb2 as feast_dot_registry_dot_RegistryServer__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
-GRPC_GENERATED_VERSION = '1.71.0'
+GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 

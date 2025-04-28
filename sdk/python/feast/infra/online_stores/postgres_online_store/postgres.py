@@ -525,6 +525,12 @@ class PostgreSQLOnlineStore(OnlineStore):
 
         distance_metric_sql = SUPPORTED_DISTANCE_METRICS_DICT[distance_metric]
 
+        vector_features = [
+            feature
+            for feature in table.features
+            if feature.vector_index and feature.name in requested_features
+        ]
+
         string_fields = [
             feature.name
             for feature in table.features
@@ -554,6 +560,7 @@ class PostgreSQLOnlineStore(OnlineStore):
                         created_ts
                     FROM {table_name}
                     WHERE feature_name = ANY(%s) AND to_tsvector('english', value_text) @@ to_tsquery('english', %s)
+                    AND feature_name IN ({vector_feature_names})
                     ORDER BY distance
                     LIMIT {top_k}
                     """
@@ -561,6 +568,9 @@ class PostgreSQLOnlineStore(OnlineStore):
                     distance_metric_sql=sql.SQL(distance_metric_sql),
                     table_name=sql.Identifier(table_name),
                     top_k=sql.Literal(top_k),
+                    vector_feature_names=sql.SQL(", ").join(
+                        sql.Identifier(feature.name) for feature in vector_features
+                    ),
                 )
                 params = (embedding, tsquery_str, string_fields, tsquery_str)
 
@@ -578,6 +588,8 @@ class PostgreSQLOnlineStore(OnlineStore):
                         event_ts,
                         created_ts
                     FROM {table_name}
+                    WHERE feature_name = ANY(%s)
+                    AND feature_name IN ({vector_feature_names})
                     ORDER BY distance
                     LIMIT {top_k}
                     """
@@ -585,6 +597,9 @@ class PostgreSQLOnlineStore(OnlineStore):
                     distance_metric_sql=sql.SQL(distance_metric_sql),
                     table_name=sql.Identifier(table_name),
                     top_k=sql.Literal(top_k),
+                    vector_feature_names=sql.SQL(", ").join(
+                        sql.Identifier(feature.name) for feature in vector_features
+                    ),
                 )
                 params = (embedding,)
 

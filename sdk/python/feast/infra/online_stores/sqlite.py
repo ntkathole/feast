@@ -509,10 +509,14 @@ class SqliteOnlineStore(OnlineStore):
                 """
             )
         elif online_store.text_search_enabled:
-            string_field_list = [
-                f.name for f in table.features if f.dtype == PrimitiveFeastType.STRING
+            text_search_fields = [
+                f.name for f in table.features if getattr(f, "text_search", False)
             ]
-            string_fields = ", ".join(string_field_list)
+            if not text_search_fields:
+                raise ValueError(
+                    f"Text search is enabled, but no fields in FeatureView '{table.name}' have text_search=True"
+                )
+            string_fields = ", ".join(text_search_fields)
             # TODO: swap this for a value configurable in each Field()
             BM25_DEFAULT_WEIGHTS = ", ".join(
                 [
@@ -529,7 +533,7 @@ class SqliteOnlineStore(OnlineStore):
                 """
             )
             insert_query = _generate_bm25_search_insert_query(
-                table_name, string_field_list
+                table_name, text_search_fields
             )
             cur.execute(insert_query)
 

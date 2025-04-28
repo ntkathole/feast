@@ -44,6 +44,7 @@ class Field:
     vector_index: bool
     vector_length: int
     vector_search_metric: Optional[str]
+    text_search: bool
 
     def __init__(
         self,
@@ -55,6 +56,7 @@ class Field:
         vector_index: bool = False,
         vector_length: int = 0,
         vector_search_metric: Optional[str] = None,
+        text_search: bool = False,
     ):
         """
         Creates a Field object.
@@ -74,6 +76,7 @@ class Field:
         self.vector_index = vector_index
         self.vector_length = vector_length
         self.vector_search_metric = vector_search_metric
+        self.text_search = text_search
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -107,6 +110,7 @@ class Field:
             f"    vector_index={self.vector_index!r}\n"
             f"    vector_length={self.vector_length!r}\n"
             f"    vector_search_metric={self.vector_search_metric!r}\n"
+            f"    text_search={self.text_search!r}\n"
             f")"
         )
 
@@ -125,6 +129,7 @@ class Field:
             vector_index=self.vector_index,
             vector_length=self.vector_length,
             vector_search_metric=vector_search_metric,
+            text_search=self.text_search,
         )
 
     @classmethod
@@ -139,6 +144,7 @@ class Field:
         vector_search_metric = getattr(field_proto, "vector_search_metric", "")
         vector_index = getattr(field_proto, "vector_index", False)
         vector_length = getattr(field_proto, "vector_length", 0)
+        text_search = getattr(field_proto, "text_search", False)
         return cls(
             name=field_proto.name,
             dtype=from_value_type(value_type=value_type),
@@ -147,6 +153,7 @@ class Field:
             vector_index=vector_index,
             vector_length=vector_length,
             vector_search_metric=vector_search_metric,
+            text_search=text_search,
         )
 
     @classmethod

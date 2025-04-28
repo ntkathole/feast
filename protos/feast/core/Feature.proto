@@ -45,4 +45,7 @@ message FeatureSpecV2 {
 
     // Field indicating the vector length
     int32 vector_length = 7;
+
+    // Field indicating text search
+    bool text_search = 8;
 }
