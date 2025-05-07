@@ -16,69 +16,232 @@ import "feast/core/ValidationProfile.proto";
 import "feast/core/InfraObject.proto";
 import "feast/core/Permission.proto";
 import "feast/core/Project.proto";
+import "google/api/annotations.proto";
 
 option go_package = "github.com/feast-dev/feast/go/protos/feast/registry";
 
 service RegistryServer{
   // Entity RPCs
-  rpc ApplyEntity (ApplyEntityRequest) returns (google.protobuf.Empty) {}
-  rpc GetEntity (GetEntityRequest) returns (feast.core.Entity) {}
-  rpc ListEntities (ListEntitiesRequest) returns (ListEntitiesResponse) {}
-  rpc DeleteEntity (DeleteEntityRequest) returns (google.protobuf.Empty) {}
+  rpc ApplyEntity (ApplyEntityRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/entities"
+      body: "entity"
+    };
+  }
+  rpc GetEntity (GetEntityRequest) returns (feast.core.Entity) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/entities/{name}"
+    };
+  }
+  rpc ListEntities (ListEntitiesRequest) returns (ListEntitiesResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/entities"
+    };
+  }
+  rpc DeleteEntity (DeleteEntityRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/entities/{name}"
+    };
+  }
   
   // DataSource RPCs
-  rpc ApplyDataSource (ApplyDataSourceRequest) returns (google.protobuf.Empty) {}
-  rpc GetDataSource (GetDataSourceRequest) returns (feast.core.DataSource) {}
-  rpc ListDataSources (ListDataSourcesRequest) returns (ListDataSourcesResponse) {}
-  rpc DeleteDataSource (DeleteDataSourceRequest) returns (google.protobuf.Empty) {}
+  rpc ApplyDataSource (ApplyDataSourceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/datasources"
+      body: "data_source"
+    };
+  }
+  rpc GetDataSource (GetDataSourceRequest) returns (feast.core.DataSource) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/datasources/{name}"
+    };
+  }
+  rpc ListDataSources (ListDataSourcesRequest) returns (ListDataSourcesResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/datasources"
+    };
+  }
+  rpc DeleteDataSource (DeleteDataSourceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/datasources/{name}"
+    };
+  }
 
   // FeatureView RPCs
-  rpc ApplyFeatureView (ApplyFeatureViewRequest) returns (google.protobuf.Empty) {}
-  rpc DeleteFeatureView (DeleteFeatureViewRequest) returns (google.protobuf.Empty) {}
-  rpc GetAnyFeatureView (GetAnyFeatureViewRequest) returns (GetAnyFeatureViewResponse) {}
-  rpc ListAllFeatureViews (ListAllFeatureViewsRequest) returns (ListAllFeatureViewsResponse) {}
+  rpc ApplyFeatureView (ApplyFeatureViewRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/featureviews"
+      body: "*"
+    };
+  }
+  rpc DeleteFeatureView (DeleteFeatureViewRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/featureviews/{name}"
+    };
+  }
+  rpc GetAnyFeatureView (GetAnyFeatureViewRequest) returns (GetAnyFeatureViewResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/featureviews/{name}"
+    };
+  }
+  rpc ListAllFeatureViews (ListAllFeatureViewsRequest) returns (ListAllFeatureViewsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/featureviews"
+    };
+  }
 
   // plain FeatureView RPCs
-  rpc GetFeatureView (GetFeatureViewRequest) returns (feast.core.FeatureView) {}
-  rpc ListFeatureViews (ListFeatureViewsRequest) returns (ListFeatureViewsResponse) {}
+  rpc GetFeatureView (GetFeatureViewRequest) returns (feast.core.FeatureView) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/featureviews/{name}"
+    };
+  }
+  rpc ListFeatureViews (ListFeatureViewsRequest) returns (ListFeatureViewsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/featureviews/plain"
+    };
+  }
 
   // StreamFeatureView RPCs
-  rpc GetStreamFeatureView (GetStreamFeatureViewRequest) returns (feast.core.StreamFeatureView) {}
-  rpc ListStreamFeatureViews (ListStreamFeatureViewsRequest) returns (ListStreamFeatureViewsResponse) {}
+  rpc GetStreamFeatureView (GetStreamFeatureViewRequest) returns (feast.core.StreamFeatureView) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/streamfeatureviews/{name}"
+    };
+  }
+  rpc ListStreamFeatureViews (ListStreamFeatureViewsRequest) returns (ListStreamFeatureViewsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/streamfeatureviews"
+    };
+  }
 
   // OnDemandFeatureView RPCs
-  rpc GetOnDemandFeatureView (GetOnDemandFeatureViewRequest) returns (feast.core.OnDemandFeatureView) {}
-  rpc ListOnDemandFeatureViews (ListOnDemandFeatureViewsRequest) returns (ListOnDemandFeatureViewsResponse) {}
+  rpc GetOnDemandFeatureView (GetOnDemandFeatureViewRequest) returns (feast.core.OnDemandFeatureView) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/ondemandfeatureviews/{name}"
+    };
+  }
+  rpc ListOnDemandFeatureViews (ListOnDemandFeatureViewsRequest) returns (ListOnDemandFeatureViewsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/ondemandfeatureviews"
+    };
+  }
+
 
   // FeatureService RPCs
-  rpc ApplyFeatureService (ApplyFeatureServiceRequest) returns (google.protobuf.Empty) {}
-  rpc GetFeatureService (GetFeatureServiceRequest) returns (feast.core.FeatureService) {}
-  rpc ListFeatureServices (ListFeatureServicesRequest) returns (ListFeatureServicesResponse) {}
-  rpc DeleteFeatureService (DeleteFeatureServiceRequest) returns (google.protobuf.Empty) {}
+  rpc ApplyFeatureService (ApplyFeatureServiceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/featureservices"
+      body: "feature_service"
+    };
+  }
+  rpc GetFeatureService (GetFeatureServiceRequest) returns (feast.core.FeatureService) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/featureservices/{name}"
+    };
+  }
+  rpc ListFeatureServices (ListFeatureServicesRequest) returns (ListFeatureServicesResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/featureservices"
+    };
+  }
+  rpc DeleteFeatureService (DeleteFeatureServiceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/featureservices/{name}"
+    };
+  }
 
   // SavedDataset RPCs
-  rpc ApplySavedDataset (ApplySavedDatasetRequest) returns (google.protobuf.Empty) {}
-  rpc GetSavedDataset (GetSavedDatasetRequest) returns (feast.core.SavedDataset) {}
-  rpc ListSavedDatasets (ListSavedDatasetsRequest) returns (ListSavedDatasetsResponse) {}
-  rpc DeleteSavedDataset (DeleteSavedDatasetRequest) returns (google.protobuf.Empty) {}
+  rpc ApplySavedDataset (ApplySavedDatasetRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/saveddatasets"
+      body: "saved_dataset"
+    };
+  }
+  rpc GetSavedDataset (GetSavedDatasetRequest) returns (feast.core.SavedDataset) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/saveddatasets/{name}"
+    };
+  }
+  rpc ListSavedDatasets (ListSavedDatasetsRequest) returns (ListSavedDatasetsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/saveddatasets"
+    };
+  }
+  rpc DeleteSavedDataset (DeleteSavedDatasetRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/saveddatasets/{name}"
+    };
+  }
 
   // ValidationReference RPCs
-  rpc ApplyValidationReference (ApplyValidationReferenceRequest) returns (google.protobuf.Empty) {}
-  rpc GetValidationReference (GetValidationReferenceRequest) returns (feast.core.ValidationReference) {}
-  rpc ListValidationReferences (ListValidationReferencesRequest) returns (ListValidationReferencesResponse) {}
-  rpc DeleteValidationReference (DeleteValidationReferenceRequest) returns (google.protobuf.Empty) {}
+  rpc ApplyValidationReference (ApplyValidationReferenceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/validationreferences"
+      body: "validation_reference"
+    };
+  }
+  rpc GetValidationReference (GetValidationReferenceRequest) returns (feast.core.ValidationReference) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/validationreferences/{name}"
+    };
+  }
+  rpc ListValidationReferences (ListValidationReferencesRequest) returns (ListValidationReferencesResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/validationreferences"
+    };
+  }
+  rpc DeleteValidationReference (DeleteValidationReferenceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/validationreferences/{name}"
+    };
+  }
 
   // Permission RPCs
-  rpc ApplyPermission (ApplyPermissionRequest) returns (google.protobuf.Empty) {}
-  rpc GetPermission (GetPermissionRequest) returns (feast.core.Permission) {}
-  rpc ListPermissions (ListPermissionsRequest) returns (ListPermissionsResponse) {}
-  rpc DeletePermission (DeletePermissionRequest) returns (google.protobuf.Empty) {}
+  rpc ApplyPermission (ApplyPermissionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects/{project}/permissions"
+      body: "permission"
+    };
+  }
+  rpc GetPermission (GetPermissionRequest) returns (feast.core.Permission) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/permissions/{name}"
+    };
+  }
+  rpc ListPermissions (ListPermissionsRequest) returns (ListPermissionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects/{project}/permissions"
+    };
+  }
+  rpc DeletePermission (DeletePermissionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{project}/permissions/{name}"
+    };
+  }
+
 
   // Project RPCs
-  rpc ApplyProject (ApplyProjectRequest) returns (google.protobuf.Empty) {}
-  rpc GetProject (GetProjectRequest) returns (feast.core.Project) {}
-  rpc ListProjects (ListProjectsRequest) returns (ListProjectsResponse) {}
-  rpc DeleteProject (DeleteProjectRequest) returns (google.protobuf.Empty) {}
+  rpc ApplyProject (ApplyProjectRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/projects"
+      body: "project"
+    };
+  }
+  rpc GetProject (GetProjectRequest) returns (feast.core.Project) {
+    option (google.api.http) = {
+      get: "/v1/projects/{name}"
+    };
+  }
+  rpc ListProjects (ListProjectsRequest) returns (ListProjectsResponse) {
+    option (google.api.http) = {
+      get: "/v1/projects"
+    };
+  }
+  rpc DeleteProject (DeleteProjectRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/projects/{name}"
+    };
+  }
 
   rpc ApplyMaterialization (ApplyMaterializationRequest) returns (google.protobuf.Empty) {}
   rpc ListProjectMetadata (ListProjectMetadataRequest) returns (ListProjectMetadataResponse) {}
