@@ -899,7 +899,9 @@ greenlet==3.2.2 \
     --hash=sha256:efcdfb9df109e8a3b475c016f60438fcd4be68cd13a365d42b35914cdab4bb2b \
     --hash=sha256:fd9fb7c941280e2c837b603850efc93c999ae58aae2b40765ed682a6907ebbc5 \
     --hash=sha256:fe46d4f8e94e637634d54477b0cfabcf93c53f29eedcbdeecaf2af32029b4421
-    # via feast (setup.py)
+    # via
+    #   feast (setup.py)
+    #   sqlalchemy
 grpc-google-iam-v1==0.14.2 \
     --hash=sha256:a3171468459770907926d56a440b2bb643eec1d7ba215f48f3ecece42b4d8351 \
     --hash=sha256:b3e1fc387a1a329e41672197d0ace9de22c78dd7d215048c4c78712073f7bd20

@@ -600,6 +600,7 @@ tomli==2.2.1 \
     # via
     #   flit-scm
     #   frozenlist
+    #   hatch-fancy-pypi-readme
     #   hatchling
     #   maturin
     #   meson-python
@@ -622,9 +623,9 @@ types-psutil==7.0.0.20250218 \
     --hash=sha256:1447a30c282aafefcf8941ece854e1100eee7b0296a9d9be9977292f0269b121 \
     --hash=sha256:1e642cdafe837b240295b23b1cbd4691d80b08a07d29932143cbbae30eb0db9c
     # via mypy
-types-setuptools==80.8.0.20250521 \
-    --hash=sha256:7360b33b1ed3cda6e5a1f379701a61ec9dbee6e59e8bda072b88226157d8da80 \
-    --hash=sha256:737cd1f54aade1f68fece1381871ea563b622b3ff28393ad65a9d4ed30d6454e
+types-setuptools==80.9.0.20250529 \
+    --hash=sha256:00dfcedd73e333a430e10db096e4d46af93faf9314f832f13b6bbe3d6757e95f \
+    --hash=sha256:79e088ba0cba2186c8d6499cbd3e143abb142d28a44b042c28d3148b1e353c91
     # via mypy
 typing-extensions==4.13.2 \
     --hash=sha256:a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c \
