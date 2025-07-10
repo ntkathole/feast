@@ -26,11 +26,20 @@ from tests.integration.feature_repos.universal.data_source_creator import (
 class RayDataSourceCreator(DataSourceCreator):
     def __init__(self, project_name: str, *args, **kwargs):
         super().__init__(project_name, *args, **kwargs)
+
         self.offline_store_config = RayOfflineStoreConfig(
             type="ray",
             storage_path="/tmp/ray-storage",
             ray_address=None,
             use_ray_cluster=False,
+            # Add resource limits for testing
+            max_cpus=2,
+            max_memory_gb=2.0,
+            # Conservative settings for testing
+            broadcast_join_threshold_mb=50,
+            max_parallelism_multiplier=1,
+            target_partition_size_mb=32,
+            window_size_for_joins="30min",
         )
         self.files: list[Any] = []
         self.dirs: list[str] = []
@@ -46,7 +55,6 @@ class RayDataSourceCreator(DataSourceCreator):
         field_mapping: Optional[Dict[str, str]] = None,
         timestamp_field: Optional[str] = "ts",
     ) -> DataSource:
-        # For Ray, we'll use parquet files as the underlying storage
         destination_name = self.get_prefixed_table_name(destination_name)
 
         f = tempfile.NamedTemporaryFile(

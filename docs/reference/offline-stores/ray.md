@@ -1,6 +1,20 @@
 # Ray Offline Store (contrib)
 
+> **⚠️ Contrib Plugin:**  
+> The Ray offline store is a contributed plugin. It may not be as stable or fully supported as core offline stores. Use with caution in production and report issues to the Feast community.
+
 The Ray offline store is a distributed offline store implementation that leverages [Ray](https://www.ray.io/) for distributed data processing. It's particularly useful for large-scale feature engineering and retrieval operations.
+
+## ⚠️ Important: Resource Management
+
+**By default, Ray will use all available system resources (CPU and memory).** This can cause issues in test environments or when experimenting locally, potentially leading to system crashes or unresponsiveness.
+
+**For testing and local experimentation, we strongly recommend:**
+
+1. **Set the environment variable:** `export FEAST_RAY_TEST_MODE=true`
+2. **Or configure resource limits** in your `feature_store.yaml` (see [Resource Management and Testing](#resource-management-and-testing) section below)
+
+This will automatically limit Ray to safe resource levels (2 CPUs, 2GB memory) for testing and development.
 
 ## Overview
 
@@ -63,6 +77,33 @@ offline_store:
 | `max_parallelism_multiplier` | int | 2 | Maximum parallelism as multiple of CPU cores |
 | `target_partition_size_mb` | int | 64 | Target size for data partitions (MB) |
 | `window_size_for_joins` | string | "1H" | Time window size for distributed temporal joins |
+| `max_cpus` | int | None | Maximum number of CPUs to use (for resource limiting) |
+| `max_memory_gb` | float | None | Maximum memory in GB to use (for resource limiting) |
+
+> **Note:** All configuration options map directly to the [`RayOfflineStoreConfig`](https://github.com/feast-dev/feast/blob/master/sdk/python/feast/infra/offline_stores/contrib/ray_offline_store/ray.py) class. See the Python source for advanced usage.
+
+## Functionality Matrix
+
+| Method                          | Supported |
+|----------------------------------|-----------|
+| get_historical_features         | Yes       |
+| pull_latest_from_table_or_query | Yes       |
+| pull_all_from_table_or_query    | Yes       |
+| offline_write_batch             | Yes       |
+| write_logged_features           | Yes       |
+
+| RetrievalJob Feature            | Supported |
+|----------------------------------|-----------|
+| export to dataframe             | Yes       |
+| export to arrow table           | Yes       |
+| persist results in offline store| Yes       |
+| local execution of ODFVs        | Yes       |
+| remote execution of ODFVs       | No        |
+| preview query plan              | Yes       |
+| read partitioned data           | Yes       |
+
+
+> For advanced users: See the Python API reference for [`RayOfflineStore`](https://github.com/feast-dev/feast/blob/master/sdk/python/feast/infra/offline_stores/contrib/ray_offline_store/ray.py), [`RayRetrievalJob`], [`RayOfflineStoreConfig`], [`RayDataProcessor`], and [`RayResourceManager`].
 
 ## Usage Examples
 
@@ -300,6 +341,55 @@ store.materialize(
 )
 ```
 
+
+### Resource Management and Testing
+
+#### Limiting Resources for Testing and Experimentation
+
+By default, Ray will use all available system resources, which can cause issues in test environments or when experimenting locally. You can limit resource usage in several ways:
+
+**1. Using Environment Variables (Recommended for Tests)**
+
+Set the `FEAST_RAY_TEST_MODE` environment variable to automatically limit resources:
+
+```bash
+export FEAST_RAY_TEST_MODE=true
+```
+
+This will limit Ray to:
+- Maximum 2 CPUs
+- Maximum 2GB memory
+
+**2. Using Configuration Options**
+
+You can specify resource limits in your `feature_store.yaml`:
+
+```yaml
+offline_store:
+    type: ray
+    # Limit resources for local development/experimentation
+    max_cpus: 2
+    max_memory_gb: 4.0
+    # Other settings...
+    broadcast_join_threshold_mb: 100
+    max_parallelism_multiplier: 1
+```
+
+**3. Test Configuration Example**
+
+For running tests or experiments on resource-constrained systems:
+
+```yaml
+offline_store:
+    type: ray
+    # Conservative settings for testing
+    max_cpus: 1
+    max_memory_gb: 2.0
+    broadcast_join_threshold_mb: 50
+    max_parallelism_multiplier: 1
+    target_partition_size_mb: 32
+    window_size_for_joins: "30min"
+```
 
 ### Custom Optimization
 
