@@ -683,6 +683,42 @@ func (feast *FeastServices) setService(svc *corev1.Service, feastType FeastServi
 		targetPort = getTargetPort(feastType, tls)
 	}
 
+	// Add service discovery annotation for REST services when REST API is enabled
+	if isRestService && feastType == RegistryFeastType {
+		domain := GetDefaultDomain(feast.Handler.Context, feast.Handler.Client)
+
+		// Override with user-specified domain if routing config exists
+		if feast.Handler.FeatureStore.Spec.Routing != nil && feast.Handler.FeatureStore.Spec.Routing.Domain != "" {
+			domain = feast.Handler.FeatureStore.Spec.Routing.Domain
+		}
+
+		if domain != "" {
+			if len(svc.Annotations) == 0 {
+				svc.Annotations = map[string]string{}
+			}
+
+			// Get port configuration
+			restPort := port
+			if feast.Handler.FeatureStore.Spec.Routing != nil && feast.Handler.FeatureStore.Spec.Routing.RestPort != nil {
+				restPort = *feast.Handler.FeatureStore.Spec.Routing.RestPort
+			}
+
+			// In OpenShift, use Route endpoint (Route handles port forwarding)
+			// In other platforms, use service endpoint with port
+			if IsOpenShift() {
+				// Route endpoint - port is handled by the Route
+				if tls.IsTLS() {
+					svc.Annotations["routing.opendatahub.io/external-address-rest"] = "https://" + svc.Name + "." + domain
+				} else {
+					svc.Annotations["routing.opendatahub.io/external-address-rest"] = "http://" + svc.Name + "." + domain
+				}
+			} else {
+				// Service endpoint with port
+				svc.Annotations["routing.opendatahub.io/external-address-rest"] = svc.Name + "." + domain + ":" + strconv.Itoa(int(restPort))
+			}
+		}
+	}
+
 	svc.Spec = corev1.ServiceSpec{
 		Selector: feast.getLabels(),
 		Type:     corev1.ServiceTypeClusterIP,
@@ -703,6 +739,11 @@ func (feast *FeastServices) setService(svc *corev1.Service, feastType FeastServi
 func (feast *FeastServices) createRestService(feastType FeastServiceType) error {
 	if feast.isRegistryServer() {
 		if !feast.isRegistryRestEnabled() {
+			if IsOpenShift() {
+				if err := feast.deleteRegistryRestRoute(feastType); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		logger := log.FromContext(feast.Handler.Context)
@@ -714,6 +755,12 @@ func (feast *FeastServices) createRestService(feastType FeastServiceType) error 
 		} else if op == controllerutil.OperationResultCreated || op == controllerutil.OperationResultUpdated {
 			logger.Info("Successfully reconciled", "Service", svc.Name, "operation", op)
 		}
+
+		if IsOpenShift() {
+			if err := feast.createRegistryRestRoute(feastType); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -721,6 +768,106 @@ func (feast *FeastServices) createRestService(feastType FeastServiceType) error 
 func (feast *FeastServices) setServiceAccount(sa *corev1.ServiceAccount) error {
 	sa.Labels = feast.getLabels()
 	return controllerutil.SetControllerReference(feast.Handler.FeatureStore, sa, feast.Handler.Scheme)
+}
+
+// createRegistryRestRoute creates an OpenShift Route for the Registry REST API
+func (feast *FeastServices) createRegistryRestRoute(feastType FeastServiceType) error {
+	if feastType != RegistryFeastType {
+		return nil
+	}
+
+	logger := log.FromContext(feast.Handler.Context)
+	route := feast.initRegistryRestRoute()
+
+	if op, err := controllerutil.CreateOrUpdate(feast.Handler.Context, feast.Handler.Client, route, controllerutil.MutateFn(func() error {
+		return feast.setRegistryRestRoute(route)
+	})); err != nil {
+		return err
+	} else if op == controllerutil.OperationResultCreated || op == controllerutil.OperationResultUpdated {
+		logger.Info("Successfully reconciled Registry REST Route", "Route", route.Name, "operation", op)
+	}
+
+	return nil
+}
+
+// deleteRegistryRestRoute deletes the OpenShift Route for the Registry REST API
+func (feast *FeastServices) deleteRegistryRestRoute(feastType FeastServiceType) error {
+	if feastType != RegistryFeastType {
+		return nil
+	}
+
+	route := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      feast.GetFeastRestServiceName(feastType) + "-route",
+			Namespace: feast.Handler.FeatureStore.Namespace,
+		},
+	}
+
+	return client.IgnoreNotFound(feast.Handler.Client.Delete(feast.Handler.Context, route))
+}
+
+// initRegistryRestRoute initializes a new Route for the Registry REST API
+func (feast *FeastServices) initRegistryRestRoute() *routev1.Route {
+	restSvcName := feast.GetFeastRestServiceName(RegistryFeastType)
+	routeName := restSvcName + "-route"
+
+	route := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: feast.Handler.FeatureStore.Namespace,
+			Labels:    feast.getFeastTypeLabels(RegistryFeastType),
+		},
+	}
+	route.SetGroupVersionKind(routev1.SchemeGroupVersion.WithKind("Route"))
+	return route
+}
+
+// setRegistryRestRoute configures the Registry REST Route
+func (feast *FeastServices) setRegistryRestRoute(route *routev1.Route) error {
+	restSvcName := feast.GetFeastRestServiceName(RegistryFeastType)
+	domain := GetDefaultDomain(feast.Handler.Context, feast.Handler.Client)
+
+	// Override with user-specified domain if routing config exists
+	if feast.Handler.FeatureStore.Spec.Routing != nil && feast.Handler.FeatureStore.Spec.Routing.Domain != "" {
+		domain = feast.Handler.FeatureStore.Spec.Routing.Domain
+	}
+
+	// Get port configuration
+	tls := feast.getTlsConfigs(RegistryFeastType)
+	var servicePort int32 = HttpPort
+	if tls.IsTLS() {
+		servicePort = HttpsPort
+	}
+
+	// Override with user-specified port if routing config exists
+	if feast.Handler.FeatureStore.Spec.Routing != nil && feast.Handler.FeatureStore.Spec.Routing.RestPort != nil {
+		servicePort = *feast.Handler.FeatureStore.Spec.Routing.RestPort
+	}
+
+	route.Labels = feast.getFeastTypeLabels(RegistryFeastType)
+
+	if domain != "" {
+		route.Spec.Host = restSvcName + "." + domain
+	}
+
+	route.Spec.To = routev1.RouteTargetReference{
+		Kind: "Service",
+		Name: restSvcName,
+	}
+
+	route.Spec.Port = &routev1.RoutePort{
+		TargetPort: intstr.FromInt(int(servicePort)),
+	}
+
+	// Configure TLS if enabled
+	if tls.IsTLS() {
+		route.Spec.TLS = &routev1.TLSConfig{
+			Termination:                   routev1.TLSTerminationEdge,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		}
+	}
+
+	return controllerutil.SetControllerReference(feast.Handler.FeatureStore, route, feast.Handler.Scheme)
 }
 
 func (feast *FeastServices) createNewPVC(pvcCreate *feastdevv1alpha1.PvcCreate, feastType FeastServiceType) (*corev1.PersistentVolumeClaim, error) {

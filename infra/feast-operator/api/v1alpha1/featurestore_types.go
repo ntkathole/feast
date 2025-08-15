@@ -75,6 +75,28 @@ type FeatureStoreSpec struct {
 	Services        *FeatureStoreServices `json:"services,omitempty"`
 	AuthzConfig     *AuthzConfig          `json:"authz,omitempty"`
 	CronJob         *FeastCronJob         `json:"cronJob,omitempty"`
+	// Optional routing configuration for service discovery
+	Routing *RoutingConfig `json:"routing,omitempty"`
+}
+
+// RoutingConfig defines optional configuration for service discovery annotations.
+// Service discovery annotations are automatically added when REST API is enabled.
+// This configuration allows overriding default domain and port settings.
+type RoutingConfig struct {
+	//+optional
+	//+kubebuilder:validation:MaxLength=253
+	//+kubebuilder:validation:Pattern=`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*)?$`
+	// Domain name for service annotations and routing.
+	// Must follow DNS952 subdomain conventions.
+	// If not provided, domain is automatically detected from the cluster or environment variables.
+	Domain string `json:"domain,omitempty"`
+
+	//+optional
+	//+kubebuilder:validation:Minimum=0
+	//+kubebuilder:validation:Maximum=65535
+	// Port for service annotations and routing.
+	// If not provided, defaults to the service port (80 for HTTP, 443 for HTTPS).
+	RestPort *int32 `json:"restPort,omitempty"`
 }
 
 // FeastProjectDir defines how to create the feast project directory.

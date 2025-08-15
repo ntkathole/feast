@@ -675,6 +675,25 @@ spec:
                 x-kubernetes-validations:
                 - message: One selection required between init or git.
                   rule: '[has(self.git), has(self.init)].exists_one(c, c)'
+              routing:
+                description: Optional routing configuration for service discovery
+                properties:
+                  domain:
+                    description: |-
+                      Domain name for service annotations and routing.
+                      Must follow DNS952 subdomain conventions.
+                    maxLength: 253
+                    pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*)?$
+                    type: string
+                  restPort:
+                    description: |-
+                      Port for service annotations and routing.
+                      If not provided, defaults to the service port (80 for HTTP, 443 for HTTPS).
+                    format: int32
+                    maximum: 65535
+                    minimum: 0
+                    type: integer
+                type: object
               services:
                 description: FeatureStoreServices defines the desired feast services.
                   An ephemeral onlineStore feature server is deployed by default.
@@ -4638,6 +4657,25 @@ spec:
                     x-kubernetes-validations:
                     - message: One selection required between init or git.
                       rule: '[has(self.git), has(self.init)].exists_one(c, c)'
+                  routing:
+                    description: Optional routing configuration for service discovery
+                    properties:
+                      domain:
+                        description: |-
+                          Domain name for service annotations and routing.
+                          Must follow DNS952 subdomain conventions.
+                        maxLength: 253
+                        pattern: ^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*)?$
+                        type: string
+                      restPort:
+                        description: |-
+                          Port for service annotations and routing.
+                          If not provided, defaults to the service port (80 for HTTP, 443 for HTTPS).
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
+                    type: object
                   services:
                     description: FeatureStoreServices defines the desired feast services.
                       An ephemeral onlineStore feature server is deployed by default.

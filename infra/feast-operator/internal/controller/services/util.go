@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -9,11 +10,13 @@ import (
 
 	"github.com/feast-dev/feast/infra/feast-operator/api/feastversion"
 	feastdevv1alpha1 "github.com/feast-dev/feast/infra/feast-operator/api/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -486,4 +489,26 @@ func boolPtr(value bool) *bool {
 
 func int64Ptr(value int64) *int64 {
 	return &value
+}
+
+// GetDefaultDomain returns the default domain for service annotations.
+// If in OpenShift, it tries to get the domain from the cluster ingress.
+// Otherwise, it checks the DEFAULT_DOMAIN environment variable.
+func GetDefaultDomain(ctx context.Context, client client.Client) string {
+	// Check environment variable first
+	if envDomain := os.Getenv("DEFAULT_DOMAIN"); envDomain != "" {
+		return envDomain
+	}
+
+	// In OpenShift, try to get domain from cluster ingress
+	if isOpenShift && client != nil {
+		ingress := configv1.Ingress{}
+		namespacedName := types.NamespacedName{Name: "cluster"}
+		err := client.Get(ctx, namespacedName, &ingress)
+		if err == nil && len(ingress.Spec.Domain) > 0 {
+			return ingress.Spec.Domain
+		}
+	}
+
+	return ""
 }
