@@ -90,11 +90,24 @@ const (
 )
 
 var (
-	DefaultImage          = "quay.io/feastdev/feature-server:" + feastversion.FeastVersion
-	DefaultCronJobImage   = "quay.io/openshift/origin-cli:4.17"
-	DefaultPVCAccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
-	NameLabelKey          = feastdevv1alpha1.GroupVersion.Group + "/name"
-	ServiceTypeLabelKey   = feastdevv1alpha1.GroupVersion.Group + "/service-type"
+	DefaultImage           = "quay.io/feastdev/feature-server:" + feastversion.FeastVersion
+	DefaultCronJobImage    = "quay.io/openshift/origin-cli:4.17"
+	DefaultOAuthProxyImage = "quay.io/openshift/origin-oauth-proxy:latest"
+	DefaultOAuthProxyPort  = int32(8443)
+	DefaultPVCAccessModes  = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	NameLabelKey           = feastdevv1alpha1.GroupVersion.Group + "/name"
+	ServiceTypeLabelKey    = feastdevv1alpha1.GroupVersion.Group + "/service-type"
+
+	// OAuth proxy container name constants
+	RegistryGrpcOAuthProxyContainer = "registry-grpc-oauth-proxy"
+	RegistryRestOAuthProxyContainer = "registry-rest-oauth-proxy"
+	OnlineOAuthProxyContainer       = "online-oauth-proxy"
+	OfflineOAuthProxyContainer      = "offline-oauth-proxy"
+	UIOAuthProxyContainer           = "ui-oauth-proxy"
+
+	// Protocol constants
+	GrpcProtocol = "grpc"
+	RestProtocol = "rest"
 
 	FeastServiceConstants = map[FeastServiceType]deploymentSettings{
 		OfflineFeastType: {

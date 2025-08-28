@@ -75,6 +75,8 @@ type FeatureStoreSpec struct {
 	Services        *FeatureStoreServices `json:"services,omitempty"`
 	AuthzConfig     *AuthzConfig          `json:"authz,omitempty"`
 	CronJob         *FeastCronJob         `json:"cronJob,omitempty"`
+	// OAuth proxy configuration options
+	OAuthProxy *OAuthProxyConfig `json:"oauthProxy,omitempty"`
 }
 
 // FeastProjectDir defines how to create the feast project directory.
@@ -607,6 +609,70 @@ type SecretKeyNames struct {
 	TlsKey string `json:"tlsKey,omitempty"`
 }
 
+// OAuthProxyConfig defines the OAuth proxy configuration for OpenShift environments
+// +kubebuilder:validation:XValidation:rule="has(self.tlsCertificateSecret) == has(self.tlsKeySecret)",message="tlsCertificateSecret and tlsKeySecret MUST be set together"
+type OAuthProxyConfig struct {
+	// Enable OAuth proxy for all Feast services (registry, online, offline)
+	// When enabled, all services will be protected by OAuth proxy sidecars
+	// Defaults to true in OpenShift environments, false otherwise
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// +kubebuilder:default=8443
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
+	// Listen port for OAuth Proxy connections, defaults to 8443
+	Port *int32 `json:"port,omitempty"`
+
+	// This parameter specifies the Kubernetes Secret name and key of the proxy public key certificate.
+	// If this option is not set, the operator uses OpenShift Serving Certificate by default in OpenShift clusters.
+	// In non-OpenShift clusters, a secret named `<featurestore-name>-oauth-proxy` MUST be provided with data keys
+	// `tls.crt` and `tls.key` for the certificate and secret key respectively.
+	// +optional
+	TLSCertificateSecret *SecretKeyValue `json:"tlsCertificateSecret,omitempty"`
+
+	// This parameter specifies the optional Kubernetes Secret name and key used for the
+	// proxy private key if `TLSCertificateSecret` is set.
+	// +optional
+	TLSKeySecret *SecretKeyValue `json:"tlsKeySecret,omitempty"`
+
+	// +kubebuilder:validation:Enum=disabled;enabled
+	// +kubebuilder:default=enabled
+	// Create OpenShift Routes for all services, enabled by default
+	ServiceRoute string `json:"serviceRoute,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*)?$`
+	// Domain name for Route configuration.
+	// Must follow DNS952 subdomain conventions.
+	// If not provided, it is set automatically using the OpenShift cluster ingress domain.
+	Domain string `json:"domain,omitempty"`
+
+	// +kubebuilder:default=443
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
+	// Listen port for OAuth Proxy Route connections, defaults to 443 in OpenShift router default configuration
+	RoutePort *int32 `json:"routePort,omitempty"`
+
+	// Optional image to support overriding the image deployed by the operator.
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// Cookie secret for OAuth proxy session management
+	// +optional
+	CookieSecret *SecretKeyValue `json:"cookieSecret,omitempty"`
+}
+
+// SecretKeyValue defines a reference to a key in a Kubernetes Secret
+type SecretKeyValue struct {
+	// +kubebuilder:validation:Required
+	// Kubernetes secret name
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	// Key name in secret
+	Key string `json:"key"`
+}
+
 // FeatureStoreStatus defines the observed state of FeatureStore
 type FeatureStoreStatus struct {
 	// Shows the currently applied feast configuration, including any pertinent defaults
@@ -634,6 +700,7 @@ type ServiceHostnames struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=feast
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="OAuthProxy",type=string,JSONPath=`.status.conditions[?(@.type=="OAuthProxyAvailable")].status`,priority=2
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // FeatureStore is the Schema for the featurestores API

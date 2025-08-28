@@ -86,6 +86,12 @@ func (r *FeatureStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	currentStatus := cr.Status.DeepCopy()
 
+	// Handle OAuth proxy configuration
+	if err := r.createOrUpdateOAuthConfig(ctx, cr); err != nil {
+		logger.Error(err, "Failed to create/update OAuth proxy configuration")
+		return ctrl.Result{Requeue: true, RequeueAfter: RequeueDelayError}, err
+	}
+
 	result, recErr = r.deployFeast(ctx, cr)
 	if cr.DeletionTimestamp == nil && !reflect.DeepEqual(currentStatus, cr.Status) {
 		if err = r.Client.Status().Update(ctx, cr); err != nil {

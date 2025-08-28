@@ -18,6 +18,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -410,6 +412,11 @@ func (feast *FeastServices) setPod(podSpec *corev1.PodSpec) error {
 	feast.mountEmptyDirVolumes(podSpec)
 	feast.mountUserDefinedVolumes(podSpec)
 
+	// Add OAuth proxy volumes if enabled
+	if feast.Handler.FeatureStore.Spec.OAuthProxy != nil && feast.isOAuthProxyEnabled() {
+		feast.mountOAuthProxyVolumes(podSpec)
+	}
+
 	return nil
 }
 
@@ -436,6 +443,23 @@ func (feast *FeastServices) setContainers(podSpec *corev1.PodSpec) error {
 }
 
 func (feast *FeastServices) setContainer(containers *[]corev1.Container, feastType FeastServiceType, fsYamlB64 string) {
+	if feast.Handler.FeatureStore.Spec.OAuthProxy != nil && feast.isOAuthProxyEnabled() {
+		switch feastType {
+		case RegistryFeastType:
+			if feast.isRegistryGrpcEnabled() {
+				oauthGrpcContainer := feast.createServiceOAuthProxyContainer(feastType, GrpcProtocol)
+				*containers = append(*containers, *oauthGrpcContainer)
+			}
+			if feast.isRegistryRestEnabled() {
+				oauthRestContainer := feast.createServiceOAuthProxyContainer(feastType, RestProtocol)
+				*containers = append(*containers, *oauthRestContainer)
+			}
+		case OnlineFeastType, OfflineFeastType, UIFeastType:
+			oauthContainer := feast.createServiceOAuthProxyContainer(feastType, "")
+			*containers = append(*containers, *oauthContainer)
+		}
+	}
+
 	if serverConfigs := feast.getServerConfigs(feastType); serverConfigs != nil {
 		name := string(feastType)
 		workingDir := feast.getFeatureRepoDir()
@@ -510,6 +534,205 @@ func getContainer(name, workingDir string, cmd []string, containerConfigs feastd
 	return container
 }
 
+func (feast *FeastServices) isOAuthProxyEnabled() bool {
+	if feast.Handler.FeatureStore.Spec.OAuthProxy == nil {
+		return false
+	}
+	if feast.Handler.FeatureStore.Spec.OAuthProxy.Enabled != nil {
+		return *feast.Handler.FeatureStore.Spec.OAuthProxy.Enabled
+	}
+	return IsOpenShift()
+}
+
+// getServicePort returns the actual port for a given service and protocol
+func (feast *FeastServices) getServicePort(feastType FeastServiceType, protocol string) int32 {
+	tls := feast.getTlsConfigs(feastType)
+
+	switch feastType {
+	case RegistryFeastType:
+		if protocol == GrpcProtocol {
+			return getTargetPort(feastType, tls)
+		} else if protocol == RestProtocol {
+			return getTargetRestPort(feastType, tls)
+		}
+		return getTargetPort(feastType, tls)
+	case OnlineFeastType, OfflineFeastType, UIFeastType:
+		return getTargetPort(feastType, tls)
+	default:
+		return getTargetPort(feastType, tls)
+	}
+}
+
+func (feast *FeastServices) createServiceOAuthProxyContainer(feastType FeastServiceType, protocol string) *corev1.Container {
+	oauthConfig := feast.Handler.FeatureStore.Spec.OAuthProxy
+	port := DefaultOAuthProxyPort
+	if oauthConfig.Port != nil {
+		port = *oauthConfig.Port
+	}
+
+	image := DefaultOAuthProxyImage
+	if oauthConfig.Image != "" {
+		image = oauthConfig.Image
+	}
+
+	var containerName, upstreamPort string
+	switch feastType {
+	case RegistryFeastType:
+		if protocol == GrpcProtocol {
+			containerName = RegistryGrpcOAuthProxyContainer
+			upstreamPort = strconv.Itoa(int(feast.getServicePort(feastType, GrpcProtocol)))
+		} else if protocol == RestProtocol {
+			containerName = RegistryRestOAuthProxyContainer
+			upstreamPort = strconv.Itoa(int(feast.getServicePort(feastType, RestProtocol)))
+		} else {
+			containerName = "registry-oauth-proxy"
+			upstreamPort = strconv.Itoa(int(feast.getServicePort(feastType, GrpcProtocol)))
+		}
+	case OnlineFeastType:
+		containerName = OnlineOAuthProxyContainer
+		upstreamPort = strconv.Itoa(int(feast.getServicePort(feastType, "")))
+	case OfflineFeastType:
+		containerName = OfflineOAuthProxyContainer
+		upstreamPort = strconv.Itoa(int(feast.getServicePort(feastType, "")))
+	case UIFeastType:
+		containerName = UIOAuthProxyContainer
+		upstreamPort = strconv.Itoa(int(feast.getServicePort(feastType, "")))
+	default:
+		containerName = "oauth-proxy"
+		upstreamPort = "8081"
+	}
+
+	container := &corev1.Container{
+		Name:  containerName,
+		Image: image,
+		Args: []string{
+			"--provider=openshift",
+			"--https-address=:8443",
+			"--http-address=",
+			fmt.Sprintf("--openshift-service-account=%s-controller-manager", feast.Handler.FeatureStore.Name),
+			"--cookie-secret-file=/etc/oauth/config/cookie_secret",
+			"--cookie-expire=24h0m0s",
+			"--tls-cert=/etc/tls/private/tls.crt",
+			"--tls-key=/etc/tls/private/tls.key",
+			fmt.Sprintf("--upstream=http://localhost:%s", upstreamPort),
+			"--upstream-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			"--skip-auth-regex=^(?:/healthz|/readyz|/metrics)$",
+			"--email-domain=*",
+			"--skip-provider-button",
+			"--openshift-sar={\"verb\":\"get\",\"resource\":\"featurestores\",\"resourceAPIGroup\":\"feast.dev\",\"namespace\":\"$(NAMESPACE)\"}",
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          containerName,
+				ContainerPort: port,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name: "NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+		},
+		LivenessProbe: &corev1.Probe{
+			FailureThreshold: 3,
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path:   "/oauth/healthz",
+					Port:   intstr.FromString(containerName),
+					Scheme: corev1.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       5,
+			SuccessThreshold:    1,
+			TimeoutSeconds:      1,
+		},
+		ReadinessProbe: &corev1.Probe{
+			FailureThreshold: 3,
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path:   "/oauth/healthz",
+					Port:   intstr.FromString(containerName),
+					Scheme: corev1.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       5,
+			SuccessThreshold:    1,
+			TimeoutSeconds:      1,
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      fmt.Sprintf("%s-oauth-config", containerName),
+				MountPath: "/etc/oauth/config",
+			},
+			{
+				Name:      fmt.Sprintf("%s-oauth-proxy-tls", containerName),
+				MountPath: "/etc/tls/private",
+			},
+		},
+	}
+
+	return container
+}
+
+func (feast *FeastServices) addServiceOAuthProxyVolumes(podSpec *corev1.PodSpec, feastType FeastServiceType, protocol string) {
+	var containerName string
+	switch feastType {
+	case RegistryFeastType:
+		if protocol == GrpcProtocol {
+			containerName = RegistryGrpcOAuthProxyContainer
+		} else if protocol == RestProtocol {
+			containerName = RegistryRestOAuthProxyContainer
+		} else {
+			containerName = "registry-oauth-proxy"
+		}
+	case OnlineFeastType:
+		containerName = OnlineOAuthProxyContainer
+	case OfflineFeastType:
+		containerName = OfflineOAuthProxyContainer
+	case UIFeastType:
+		containerName = UIOAuthProxyContainer
+	default:
+		containerName = "oauth-proxy"
+	}
+
+	oauthConfigVolume := corev1.Volume{
+		Name: fmt.Sprintf("%s-oauth-config", containerName),
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-%s-oauth-proxy-config", feast.Handler.FeatureStore.Name, containerName),
+			},
+		},
+	}
+	podSpec.Volumes = append(podSpec.Volumes, oauthConfigVolume)
+
+	oauthTlsVolume := corev1.Volume{
+		Name: fmt.Sprintf("%s-oauth-proxy-tls", containerName),
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-%s-oauth-proxy-tls", feast.Handler.FeatureStore.Name, containerName),
+			},
+		},
+	}
+	podSpec.Volumes = append(podSpec.Volumes, oauthTlsVolume)
+}
+
 func (feast *FeastServices) mountUserDefinedVolumes(podSpec *corev1.PodSpec) {
 	var volumes []corev1.Volume
 	if feast.Handler.FeatureStore.Status.Applied.Services != nil {
@@ -517,6 +740,27 @@ func (feast *FeastServices) mountUserDefinedVolumes(podSpec *corev1.PodSpec) {
 	}
 	if len(volumes) > 0 {
 		podSpec.Volumes = append(podSpec.Volumes, volumes...)
+	}
+}
+
+func (feast *FeastServices) mountOAuthProxyVolumes(podSpec *corev1.PodSpec) {
+	// Add OAuth proxy volumes for all enabled services
+	if feast.isRegistryServer() {
+		if feast.isRegistryGrpcEnabled() {
+			feast.addServiceOAuthProxyVolumes(podSpec, RegistryFeastType, GrpcProtocol)
+		}
+		if feast.isRegistryRestEnabled() {
+			feast.addServiceOAuthProxyVolumes(podSpec, RegistryFeastType, RestProtocol)
+		}
+	}
+	if feast.isOnlineServer() {
+		feast.addServiceOAuthProxyVolumes(podSpec, OnlineFeastType, "")
+	}
+	if feast.isOfflineServer() {
+		feast.addServiceOAuthProxyVolumes(podSpec, OfflineFeastType, "")
+	}
+	if feast.isUiServer() {
+		feast.addServiceOAuthProxyVolumes(podSpec, UIFeastType, "")
 	}
 }
 
@@ -694,6 +938,58 @@ func (feast *FeastServices) setService(svc *corev1.Service, feastType FeastServi
 				TargetPort: intstr.FromInt(int(targetPort)),
 			},
 		},
+	}
+
+	if feast.Handler.FeatureStore.Spec.OAuthProxy != nil && feast.isOAuthProxyEnabled() {
+		switch feastType {
+		case RegistryFeastType:
+			oauthPort := DefaultOAuthProxyPort
+			if feast.Handler.FeatureStore.Spec.OAuthProxy.Port != nil {
+				oauthPort = *feast.Handler.FeatureStore.Spec.OAuthProxy.Port
+			}
+
+			if feast.isRegistryGrpcEnabled() {
+				oauthGrpcServicePort := corev1.ServicePort{
+					Name:       "registry-grpc-oauth-proxy",
+					Port:       oauthPort,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromString("registry-grpc-oauth-proxy"),
+				}
+				svc.Spec.Ports = append(svc.Spec.Ports, oauthGrpcServicePort)
+			}
+			if feast.isRegistryRestEnabled() {
+				oauthRestServicePort := corev1.ServicePort{
+					Name:       "registry-rest-oauth-proxy",
+					Port:       oauthPort,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromString("registry-rest-oauth-proxy"),
+				}
+				svc.Spec.Ports = append(svc.Spec.Ports, oauthRestServicePort)
+			}
+		case OnlineFeastType, OfflineFeastType, UIFeastType:
+			oauthPort := DefaultOAuthProxyPort
+			if feast.Handler.FeatureStore.Spec.OAuthProxy.Port != nil {
+				oauthPort = *feast.Handler.FeatureStore.Spec.OAuthProxy.Port
+			}
+
+			var containerName string
+			switch feastType {
+			case OnlineFeastType:
+				containerName = "online-oauth-proxy"
+			case OfflineFeastType:
+				containerName = "offline-oauth-proxy"
+			case UIFeastType:
+				containerName = "ui-oauth-proxy"
+			}
+
+			oauthServicePort := corev1.ServicePort{
+				Name:       containerName,
+				Port:       oauthPort,
+				Protocol:   corev1.ProtocolTCP,
+				TargetPort: intstr.FromString(containerName),
+			}
+			svc.Spec.Ports = append(svc.Spec.Ports, oauthServicePort)
+		}
 	}
 
 	return controllerutil.SetControllerReference(feast.Handler.FeatureStore, svc, feast.Handler.Scheme)
