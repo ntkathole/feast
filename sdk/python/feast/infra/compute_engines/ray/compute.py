@@ -11,6 +11,10 @@ from feast import (
     OnDemandFeatureView,
     StreamFeatureView,
 )
+from feast.infra.codeflare_ray_wrapper import (
+    get_ray_wrapper,
+    initialize_ray_wrapper_from_config,
+)
 from feast.infra.common.materialization_job import (
     MaterializationJob,
     MaterializationJobStatus,
@@ -46,6 +50,7 @@ class RayComputeEngine(ComputeEngine):
         repo_config,
         **kwargs,
     ):
+        logger.info("Initializing Ray compute engine")
         super().__init__(
             offline_store=offline_store,
             online_store=online_store,
@@ -54,10 +59,50 @@ class RayComputeEngine(ComputeEngine):
         )
         self.config = repo_config.batch_engine
         assert isinstance(self.config, RayComputeEngineConfig)
+        logger.info(f"🎮 ENGINE: Got batch_engine config: {self.config}")
+
+        # Check if KubeRay is configured
+        is_kuberay = self.config.use_kuberay or (
+            self.config.kuberay_conf and self.config.kuberay_conf.get("cluster_name")
+        )
+        # Initialize Ray (this will delegate to CodeFlare wrapper if KubeRay is configured)
+        if is_kuberay:
+            logger.info(
+                "KubeRay configuration detected, initializing job submission mode"
+            )
         self._ensure_ray_initialized()
+
+        # Only initialize wrapper if not already done by _ensure_ray_initialized for KubeRay
+        if not is_kuberay:
+            logger.info("Initializing wrapper for non-KubeRay mode")
+            initialize_ray_wrapper_from_config(self.config)
+        else:
+            logger.info("Skipping wrapper initialization (already done for KubeRay)")
 
     def _ensure_ray_initialized(self):
         """Ensure Ray is initialized with proper configuration."""
+        logger.info("Ensuring Ray is initialized")
+
+        # Check if KubeRay is configured - if so, let the CodeFlare wrapper handle initialization
+        kuberay_detected = self.config.use_kuberay or (
+            self.config.kuberay_conf and self.config.kuberay_conf.get("cluster_name")
+        )
+
+        logger.info(f"KubeRay detection result: {kuberay_detected}")
+
+        if kuberay_detected:
+            logger.info(
+                "KubeRay configuration detected - delegating to CodeFlare wrapper"
+            )
+            # Initialize the wrapper which will handle KubeRay authentication and connection
+            initialize_ray_wrapper_from_config(self.config)
+            logger.info("CodeFlare wrapper initialization completed")
+            return
+        else:
+            logger.info(
+                "No KubeRay configuration detected, proceeding with standard Ray init"
+            )
+
         if not ray.is_initialized():
             if self.config.ray_address:
                 ray.init(
@@ -230,7 +275,8 @@ class RayComputeEngine(ComputeEngine):
 
                 # Write to sink_source using Ray data
                 try:
-                    ray_dataset = ray.data.from_arrow(arrow_table)
+                    ray_wrapper = get_ray_wrapper()
+                    ray_dataset = ray_wrapper.from_arrow(arrow_table)
                     ray_dataset.write_parquet(sink_source.path)
                 except Exception as e:
                     logger.error(
