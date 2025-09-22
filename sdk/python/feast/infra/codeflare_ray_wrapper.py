@@ -68,6 +68,8 @@ class CodeFlareRayWrapper:
         self.cluster = None
         self._ray_initialized = False
         self._authenticated = False  # Track authentication status
+        self._job_submission_mode = False  # Track if we're using job submission
+        self.job_client = None  # CodeFlare job client
 
         logger.info(
             f"Ray wrapper initialized in {'KubeRay' if self.use_kuberay else 'client-side'} mode"
@@ -192,6 +194,23 @@ class CodeFlareRayWrapper:
                         f"Connecting to KubeRay cluster at: {cluster_uri} (attempt {attempt + 1}/{self.max_retries})"
                     )
 
+                    # Try to get external endpoint if available
+                    print(f"🚨 CRITICAL: Default cluster URI: {cluster_uri}")
+                    try:
+                        # Check if there's an external endpoint available
+                        if hasattr(cluster, "cluster_dashboard_uri"):
+                            dashboard_uri = cluster.cluster_dashboard_uri()
+                            print(f"🚨 CRITICAL: Dashboard URI: {dashboard_uri}")
+
+                        # Log cluster status for debugging
+                        if hasattr(cluster, "status"):
+                            status = cluster.status()
+                            print(f"🚨 CRITICAL: Cluster status: {status}")
+                    except Exception as e:
+                        print(
+                            f"🚨 CRITICAL: Could not get additional cluster info: {e}"
+                        )
+
                     # Test cluster connectivity before Ray connection
                     if not self._test_cluster_connectivity(cluster_uri):
                         if attempt < self.max_retries - 1:
@@ -208,18 +227,113 @@ class CodeFlareRayWrapper:
                             return False
 
                     # Prepare Ray init kwargs with timeout settings
-                    ray_kwargs = {
-                        "address": cluster_uri,
-                        "ignore_reinit_error": True,
-                        "log_to_driver": True,
-                    }
+                    # Try to connect directly to head node instead of using Ray Client
+
+                    # Extract host and port from cluster URI
+                    import urllib.parse
+
+                    parsed_uri = urllib.parse.urlparse(cluster_uri)
+
+                    if parsed_uri.scheme == "ray":
+                        # Ray clusters typically use different ports for different services:
+                        # - 10001: Ray Client port (not for direct connection)
+                        # - 6379: GCS/Redis port (for direct connection)
+                        # - 8265: Dashboard port
+
+                        hostname = parsed_uri.hostname
+                        original_port = parsed_uri.port
+
+                        print(f"🚨 CRITICAL: Original Ray URI: {cluster_uri}")
+                        print(
+                            f"🚨 CRITICAL: Hostname: {hostname}, Original port: {original_port}"
+                        )
+
+                        # Try Ray GCS port first (6379 is the standard GCS/Redis port)
+                        possible_ports = [
+                            6379,
+                            original_port,
+                        ]  # 6379 is GCS, 10001 is client
+
+                        direct_address = None
+                        for gcs_port in possible_ports:
+                            test_address = f"{hostname}:{gcs_port}"
+                            print(
+                                f"🚨 CRITICAL: Testing Ray GCS connection to: {test_address}"
+                            )
+
+                            # Test basic connectivity to this port
+                            if self._test_cluster_connectivity(f"ray://{test_address}"):
+                                print(
+                                    f"🚨 CRITICAL: ✅ Port {gcs_port} is reachable, using for Ray connection"
+                                )
+                                direct_address = test_address
+                                break
+                            else:
+                                print(f"🚨 CRITICAL: ❌ Port {gcs_port} not reachable")
+
+                        # Fallback to original port if none work
+                        if not direct_address:
+                            direct_address = f"{hostname}:{original_port}"
+                            print(
+                                f"🚨 CRITICAL: Using fallback address: {direct_address}"
+                            )
+
+                        ray_kwargs = {
+                            "address": direct_address,
+                            "ignore_reinit_error": True,
+                            "log_to_driver": True,
+                        }
+                    else:
+                        # Fallback to original URI
+                        ray_kwargs = {
+                            "address": cluster_uri,
+                            "ignore_reinit_error": True,
+                            "log_to_driver": True,
+                        }
 
                     # Add authentication token if available
                     if self.auth_token:
                         logger.info("Using authentication token for Ray connection")
                         ray_kwargs["_redis_password"] = self.auth_token
 
-                    # Initialize Ray with timeout
+                    print("🚨 CRITICAL: Ray connection parameters:")
+                    print(f"🚨 CRITICAL: cluster_uri = {cluster_uri}")
+                    print(f"🚨 CRITICAL: ray_kwargs = {ray_kwargs}")
+                    print(
+                        f"🚨 CRITICAL: connection_timeout = {self.connection_timeout}"
+                    )
+                    print(f"🚨 CRITICAL: max_retries = {self.max_retries}")
+                    print(f"🚨 CRITICAL: retry_delay = {self.retry_delay}")
+
+                    # Test network connectivity first
+                    print("🚨 CRITICAL: Testing network connectivity...")
+                    if self._test_cluster_connectivity(cluster_uri):
+                        print("🚨 CRITICAL: ✅ Network connectivity test PASSED")
+                    else:
+                        print("🚨 CRITICAL: ❌ Network connectivity test FAILED")
+
+                    # Use CodeFlare SDK's Job Submission Architecture
+                    print("🚨 CRITICAL: Setting up CodeFlare Job Submission Client...")
+                    try:
+                        # Use CodeFlare's job submission architecture instead of direct ray.init()
+                        self.job_client = cluster.job_client
+                        print("🚨 CRITICAL: ✅ CodeFlare Job Submission Client ready!")
+                        logger.info(
+                            f"✓ Successfully set up job client for KubeRay cluster: {self.cluster_name}"
+                        )
+                        self._ray_initialized = True
+                        self._job_submission_mode = (
+                            True  # Flag to indicate we're using job submission
+                        )
+                        return True
+                    except Exception as job_client_error:
+                        print(
+                            f"🚨 CRITICAL: ❌ CodeFlare Job Client setup failed: {job_client_error}"
+                        )
+                        print("🚨 CRITICAL: Falling back to direct Ray connection...")
+
+                    # Fallback to direct Ray initialization
+                    print("🚨 CRITICAL: Starting direct Ray initialization...")
                     success = self._init_ray_with_timeout(ray_kwargs)
                     if success:
                         logger.info(
@@ -471,6 +585,12 @@ def initialize_ray_wrapper_from_config(config: Any) -> CodeFlareRayWrapper:
     Returns:
         CodeFlareRayWrapper instance
     """
+    print("=" * 80)
+    print(
+        "🚨 CRITICAL: initialize_ray_wrapper_from_config() called - WRAPPER CHANGES APPLIED!"
+    )
+    print(f"🚨 CRITICAL: Config type: {type(config)}")
+    print("=" * 80)
     logger.info("🎯 WRAPPER: initialize_ray_wrapper_from_config() called")
     logger.info(f"🎯 WRAPPER: Config type: {type(config)}")
     logger.info(f"🎯 WRAPPER: Config details: {config}")
@@ -479,7 +599,9 @@ def initialize_ray_wrapper_from_config(config: Any) -> CodeFlareRayWrapper:
 
     # Use the new configuration manager approach
     logger.info("🎯 WRAPPER: Creating CodeFlareRayWrapper instance")
+    print("🚨 CRITICAL: About to create CodeFlareRayWrapper instance")
     _ray_wrapper = CodeFlareRayWrapper(config=config)
+    print("🚨 CRITICAL: CodeFlareRayWrapper instance created!")
     logger.info("🎯 WRAPPER: CodeFlareRayWrapper created successfully")
 
     return _ray_wrapper

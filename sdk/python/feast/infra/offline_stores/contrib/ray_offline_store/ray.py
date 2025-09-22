@@ -1193,6 +1193,11 @@ class RayRetrievalJob(RetrievalJob):
 
 class RayOfflineStore(OfflineStore):
     def __init__(self) -> None:
+        print("=" * 80)
+        print(
+            "🚨 CRITICAL: RayOfflineStore.__init__() called - OFFLINE STORE CHANGES APPLIED!"
+        )
+        print("=" * 80)
         logger.info("🏪 STORE: RayOfflineStore.__init__() called")
         self._staging_location: Optional[str] = None
         self._ray_initialized: bool = False
