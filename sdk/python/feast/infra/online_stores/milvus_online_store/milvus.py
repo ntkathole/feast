@@ -181,11 +181,15 @@ class MilvusOnlineStore(OnlineStore):
                             )
                         )
                     else:
+                        # Check if this is an ImageBytes field which needs larger max_length
+                        from feast.types import ImageBytes
+
+                        max_length = 65535 if field.dtype == ImageBytes else 512
                         fields.append(
                             FieldSchema(
                                 name=field.name,
                                 dtype=DataType.VARCHAR,
-                                max_length=512,
+                                max_length=max_length,
                             )
                         )
 

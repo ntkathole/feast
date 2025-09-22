@@ -1,0 +1,16 @@
+project: my_project
+registry: data/registry.db
+provider: local
+online_store:
+  type: milvus
+  host: http://localhost
+  port: 19530
+  username: ""
+  password: ""
+  vector_enabled: true
+  embedding_dim: 512
+  index_type: IVF_FLAT
+  metric_type: COSINE
+offline_store:
+  type: file
+entity_key_serialization_version: 3
