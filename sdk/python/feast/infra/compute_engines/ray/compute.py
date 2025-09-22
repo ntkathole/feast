@@ -50,10 +50,7 @@ class RayComputeEngine(ComputeEngine):
         repo_config,
         **kwargs,
     ):
-        print("=" * 80)
-        print("🚨 CRITICAL: RayComputeEngine.__init__() called - CHANGES ARE APPLIED!")
-        print("=" * 80)
-        logger.info("🎮 ENGINE: RayComputeEngine.__init__() called")
+        logger.info("Initializing Ray compute engine")
         super().__init__(
             offline_store=offline_store,
             online_store=online_store,
@@ -68,48 +65,38 @@ class RayComputeEngine(ComputeEngine):
         is_kuberay = self.config.use_kuberay or (
             self.config.kuberay_conf and self.config.kuberay_conf.get("cluster_name")
         )
-        logger.info(f"🎮 ENGINE: KubeRay detection in __init__: {is_kuberay}")
-        print(f"🚨 CRITICAL: KubeRay detected in compute engine: {is_kuberay}")
-
         # Initialize Ray (this will delegate to CodeFlare wrapper if KubeRay is configured)
-        print("🚨 CRITICAL: About to call _ensure_ray_initialized()")
+        if is_kuberay:
+            logger.info(
+                "KubeRay configuration detected, initializing job submission mode"
+            )
         self._ensure_ray_initialized()
-        print("🚨 CRITICAL: _ensure_ray_initialized() completed")
 
         # Only initialize wrapper if not already done by _ensure_ray_initialized for KubeRay
         if not is_kuberay:
-            logger.info("🎮 ENGINE: Initializing wrapper for non-KubeRay mode")
+            logger.info("Initializing wrapper for non-KubeRay mode")
             initialize_ray_wrapper_from_config(self.config)
         else:
-            logger.info(
-                "🎮 ENGINE: Skipping wrapper initialization (already done for KubeRay)"
-            )
+            logger.info("Skipping wrapper initialization (already done for KubeRay)")
 
     def _ensure_ray_initialized(self):
         """Ensure Ray is initialized with proper configuration."""
-        print("🚨 CRITICAL: _ensure_ray_initialized() method called!")
-        logger.info("🎮 ENGINE: _ensure_ray_initialized() called")
+        logger.info("Ensuring Ray is initialized")
 
         # Check if KubeRay is configured - if so, let the CodeFlare wrapper handle initialization
         kuberay_detected = self.config.use_kuberay or (
             self.config.kuberay_conf and self.config.kuberay_conf.get("cluster_name")
         )
 
-        print(
-            f"🚨 CRITICAL: KubeRay detection in _ensure_ray_initialized: {kuberay_detected}"
-        )
-        print(f"🚨 CRITICAL: use_kuberay = {self.config.use_kuberay}")
-        print(f"🚨 CRITICAL: kuberay_conf = {self.config.kuberay_conf}")
-        logger.info(f"🎮 ENGINE: KubeRay detection result: {kuberay_detected}")
+        logger.info(f"KubeRay detection result: {kuberay_detected}")
 
         if kuberay_detected:
-            print("🚨 CRITICAL: KUBERAY DETECTED! Delegating to CodeFlare wrapper")
             logger.info(
-                "✅ ENGINE: KubeRay configuration detected - delegating to CodeFlare wrapper"
+                "KubeRay configuration detected - delegating to CodeFlare wrapper"
             )
             # Initialize the wrapper which will handle KubeRay authentication and connection
             initialize_ray_wrapper_from_config(self.config)
-            print("🚨 CRITICAL: CodeFlare wrapper initialization completed!")
+            logger.info("CodeFlare wrapper initialization completed")
             return
         else:
             print("🚨 CRITICAL: NO KUBERAY DETECTED! Using standard Ray init")

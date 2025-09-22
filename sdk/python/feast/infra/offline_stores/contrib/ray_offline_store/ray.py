@@ -63,9 +63,32 @@ from feast.utils import _get_column_names, make_df_tzaware, make_tzaware
 
 logger = logging.getLogger(__name__)
 
+# Import RemoteDatasetProxy to handle isinstance checks
+try:
+    from feast.infra.codeflare_ray_wrapper import RemoteDatasetProxy
+
+    REMOTE_DATASET_PROXY_AVAILABLE = True
+except ImportError:
+    # Fallback for when codeflare_ray_wrapper is not available
+    RemoteDatasetProxy = None  # type: ignore
+    REMOTE_DATASET_PROXY_AVAILABLE = False
+
+
+def _is_ray_dataset(data: Any) -> bool:
+    """Check if data is a Ray Dataset or RemoteDatasetProxy."""
+    if isinstance(data, Dataset):
+        return True
+    if (
+        REMOTE_DATASET_PROXY_AVAILABLE
+        and RemoteDatasetProxy is not None
+        and isinstance(data, RemoteDatasetProxy)
+    ):
+        return True
+    return False
+
 
 def _get_data_schema_info(
-    data: Union[pd.DataFrame, Dataset],
+    data: Union[pd.DataFrame, Dataset, Any],
 ) -> Tuple[Dict[str, Any], List[str]]:
     """
     Extract schema information from DataFrame or Dataset.
@@ -74,7 +97,7 @@ def _get_data_schema_info(
     Returns:
         Tuple of (dtypes_dict, column_names)
     """
-    if isinstance(data, Dataset):
+    if _is_ray_dataset(data):
         schema = data.schema()
         dtypes = {}
         for i, col in enumerate(schema.names):
@@ -88,16 +111,17 @@ def _get_data_schema_info(
                 dtypes[col] = pd.api.types.pandas_dtype("object")
         columns = schema.names
     else:
+        assert isinstance(data, pd.DataFrame)
         dtypes = data.dtypes.to_dict()
         columns = list(data.columns)
     return dtypes, columns
 
 
 def _apply_to_data(
-    data: Union[pd.DataFrame, Dataset],
+    data: Union[pd.DataFrame, Dataset, Any],
     process_func: Callable[[pd.DataFrame], pd.DataFrame],
     inplace: bool = False,
-) -> Union[pd.DataFrame, Dataset]:
+) -> Union[pd.DataFrame, Dataset, Any]:
     """
     Apply a processing function to DataFrame or Dataset.
     Args:
@@ -107,9 +131,10 @@ def _apply_to_data(
     Returns:
         Processed DataFrame or Dataset
     """
-    if isinstance(data, Dataset):
+    if _is_ray_dataset(data):
         return data.map_batches(process_func, batch_format="pandas")
     else:
+        assert isinstance(data, pd.DataFrame)
         if not inplace:
             data = data.copy()
         return process_func(data)
@@ -174,7 +199,7 @@ def _safe_get_entity_timestamp_bounds(
         Tuple of (min_timestamp, max_timestamp) or (None, None) if failed
     """
     try:
-        if isinstance(data, Dataset):
+        if _is_ray_dataset(data):
             min_ts = data.min(timestamp_column)
             max_ts = data.max(timestamp_column)
         else:
@@ -196,7 +221,7 @@ def _safe_get_entity_timestamp_bounds(
             f"Timestamp bounds extraction failed: {e}, falling back to manual calculation"
         )
         try:
-            if isinstance(data, Dataset):
+            if _is_ray_dataset(data):
 
                 def extract_bounds(batch: pd.DataFrame) -> pd.DataFrame:
                     if timestamp_column in batch.columns and not batch.empty:
@@ -216,6 +241,8 @@ def _safe_get_entity_timestamp_bounds(
                     if pd.notna(min_ts) and pd.notna(max_ts):
                         return min_ts.to_pydatetime(), max_ts.to_pydatetime()
             else:
+                # Must be pandas DataFrame in else branch
+                assert isinstance(data, pd.DataFrame)
                 if timestamp_column in data.columns:
                     timestamps = pd.to_datetime(data[timestamp_column], utc=True)
                     return (
@@ -375,10 +402,29 @@ class RayResourceManager:
         Initialize the resource manager with cluster resource information.
         """
         self.config = config or RayOfflineStoreConfig()
-        self.cluster_resources = ray.cluster_resources()
-        self.available_memory = self.cluster_resources.get("memory", 8 * 1024**3)
-        self.available_cpus = int(self.cluster_resources.get("CPU", 4))
-        self.num_nodes = len(ray.nodes()) if ray.is_initialized() else 1
+
+        # Use default resource estimates for job submission mode
+        # In job submission mode, we don't have direct access to cluster resources
+        try:
+            if ray.is_initialized():
+                self.cluster_resources = ray.cluster_resources()
+                self.available_memory = self.cluster_resources.get(
+                    "memory", 8 * 1024**3
+                )
+                self.available_cpus = int(self.cluster_resources.get("CPU", 4))
+                self.num_nodes = len(ray.nodes())
+            else:
+                # Job submission mode - use reasonable defaults for KubeRay cluster
+                self.cluster_resources = {"CPU": 16, "memory": 32 * 1024**3}
+                self.available_memory = 32 * 1024**3  # 32GB
+                self.available_cpus = 16  # 16 CPUs
+                self.num_nodes = 4  # Typical cluster size
+        except Exception:
+            # Fallback defaults
+            self.cluster_resources = {"CPU": 16, "memory": 32 * 1024**3}
+            self.available_memory = 32 * 1024**3
+            self.available_cpus = 16
+            self.num_nodes = 4
 
     def configure_ray_context(self) -> None:
         """
@@ -937,7 +983,7 @@ class RayRetrievalJob(RetrievalJob):
         else:
             try:
                 result = self._resolve()
-                if isinstance(result, Dataset):
+                if _is_ray_dataset(result):
                     timestamp_col = _safe_infer_event_timestamp_column(
                         result, "event_timestamp"
                     )
@@ -982,7 +1028,7 @@ class RayRetrievalJob(RetrievalJob):
             return self._cached_dataset
 
         result = self._resolve()
-        if isinstance(result, Dataset):
+        if _is_ray_dataset(result):
             self._cached_dataset = result
             return result
         elif isinstance(result, pd.DataFrame):
@@ -1193,12 +1239,7 @@ class RayRetrievalJob(RetrievalJob):
 
 class RayOfflineStore(OfflineStore):
     def __init__(self) -> None:
-        print("=" * 80)
-        print(
-            "🚨 CRITICAL: RayOfflineStore.__init__() called - OFFLINE STORE CHANGES APPLIED!"
-        )
-        print("=" * 80)
-        logger.info("🏪 STORE: RayOfflineStore.__init__() called")
+        logger.info("Initializing Ray offline store")
         self._staging_location: Optional[str] = None
         self._ray_initialized: bool = False
         self._resource_manager: Optional[RayResourceManager] = None

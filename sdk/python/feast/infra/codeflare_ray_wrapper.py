@@ -1,51 +1,205 @@
-"""
-Efficient Ray Data wrapper for Feast operations.
+# Copyright 2025 The Feast Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-This module provides a unified interface for Ray Data operations that can work
-with local Ray clusters and KubeRay clusters via CodeFlare SDK. The key design
-principle is efficiency: Ray connection is established once during initialization,
-and all subsequent operations use ray.data directly without repeated initialization.
+"""
+CodeFlare Ray wrapper for KubeRay integration using TLS certificates and direct Ray connection.
 """
 
 import logging
-import time
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 import pyarrow as pa
 import ray
-import ray.data
 
 from feast.infra.ray_config_manager import RayConfigManager, RayExecutionMode
 
 logger = logging.getLogger(__name__)
 
-try:
-    from codeflare_sdk import Cluster, TokenAuthentication, get_cluster
 
-    CODEFLARE_AVAILABLE = True
-except ImportError:
-    CODEFLARE_AVAILABLE = False
-    logger.warning("CodeFlare SDK not available. KubeRay functionality disabled.")
+class RemoteDatasetProxy:
+    """Proxy class that executes Ray Data operations remotely on cluster workers."""
+
+    def __init__(self, dataset_ref: Any):
+        """Initialize with a reference to the remote dataset."""
+        self._dataset_ref = dataset_ref
+
+    def map_batches(self, func, **kwargs) -> "RemoteDatasetProxy":
+        """Execute map_batches remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_map_batches(dataset, function, batch_kwargs):
+            return dataset.map_batches(function, **batch_kwargs)
+
+        new_ref = ray.get(_remote_map_batches.remote(self._dataset_ref, func, kwargs))
+        return RemoteDatasetProxy(new_ref)
+
+    def sort(self, key, descending=False) -> "RemoteDatasetProxy":
+        """Execute sort remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_sort(dataset, sort_key, desc):
+            return dataset.sort(sort_key, descending=desc)
+
+        new_ref = ray.get(_remote_sort.remote(self._dataset_ref, key, descending))
+        return RemoteDatasetProxy(new_ref)
+
+    def union(self, other: "RemoteDatasetProxy") -> "RemoteDatasetProxy":
+        """Execute union remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_union(dataset1, dataset2):
+            return dataset1.union(dataset2)
+
+        new_ref = ray.get(_remote_union.remote(self._dataset_ref, other._dataset_ref))
+        return RemoteDatasetProxy(new_ref)
+
+    def write_parquet(self, path: str) -> None:
+        """Execute write_parquet remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_write_parquet(dataset, file_path):
+            dataset.write_parquet(file_path)
+            return None
+
+        ray.get(_remote_write_parquet.remote(self._dataset_ref, path))
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Execute to_pandas remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_to_pandas(dataset):
+            return dataset.to_pandas()
+
+        return ray.get(_remote_to_pandas.remote(self._dataset_ref))
+
+    def to_arrow(self) -> pa.Table:
+        """Execute to_arrow remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_to_arrow(dataset):
+            return dataset.to_arrow()
+
+        return ray.get(_remote_to_arrow.remote(self._dataset_ref))
+
+    def schema(self) -> Any:
+        """Execute schema remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_schema(dataset):
+            return dataset.schema()
+
+        return ray.get(_remote_schema.remote(self._dataset_ref))
+
+    def limit(self, count: int) -> "RemoteDatasetProxy":
+        """Execute limit remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_limit(dataset, limit_count):
+            return dataset.limit(limit_count)
+
+        new_ref = ray.get(_remote_limit.remote(self._dataset_ref, count))
+        return RemoteDatasetProxy(new_ref)
+
+    def materialize(self) -> "RemoteDatasetProxy":
+        """Execute materialize remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_materialize(dataset):
+            return dataset.materialize()
+
+        new_ref = ray.get(_remote_materialize.remote(self._dataset_ref))
+        return RemoteDatasetProxy(new_ref)
+
+    def filter(self, fn) -> "RemoteDatasetProxy":
+        """Execute filter remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_filter(dataset, filter_fn):
+            return dataset.filter(filter_fn)
+
+        new_ref = ray.get(_remote_filter.remote(self._dataset_ref, fn))
+        return RemoteDatasetProxy(new_ref)
+
+    def size_bytes(self) -> int:
+        """Execute size_bytes remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_size_bytes(dataset):
+            return dataset.size_bytes()
+
+        return ray.get(_remote_size_bytes.remote(self._dataset_ref))
+
+    def repartition(self, **kwargs) -> "RemoteDatasetProxy":
+        """Execute repartition remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_repartition(dataset, repartition_kwargs):
+            return dataset.repartition(**repartition_kwargs)
+
+        new_ref = ray.get(_remote_repartition.remote(self._dataset_ref, kwargs))
+        return RemoteDatasetProxy(new_ref)
+
+    def random_shuffle(self, **kwargs) -> "RemoteDatasetProxy":
+        """Execute random_shuffle remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_random_shuffle(dataset, shuffle_kwargs):
+            return dataset.random_shuffle(**shuffle_kwargs)
+
+        new_ref = ray.get(_remote_random_shuffle.remote(self._dataset_ref, kwargs))
+        return RemoteDatasetProxy(new_ref)
+
+    def min(self, column: str) -> Any:
+        """Execute min remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_min(dataset, col):
+            return dataset.min(col)
+
+        return ray.get(_remote_min.remote(self._dataset_ref, column))
+
+    def max(self, column: str) -> Any:
+        """Execute max remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_max(dataset, col):
+            return dataset.max(col)
+
+        return ray.get(_remote_max.remote(self._dataset_ref, column))
+
+    def copy(self) -> "RemoteDatasetProxy":
+        """Execute copy remotely on cluster workers."""
+
+        @ray.remote
+        def _remote_copy(dataset):
+            return dataset.copy()
+
+        new_ref = ray.get(_remote_copy.remote(self._dataset_ref))
+        return RemoteDatasetProxy(new_ref)
 
 
 class CodeFlareRayWrapper:
     """
-    Efficient wrapper for Ray Data operations.
+    Wrapper for CodeFlare SDK integration with KubeRay clusters using TLS certificates.
 
-    This wrapper establishes the Ray connection once during initialization and then
-    uses ray.data operations directly. For KubeRay mode, it connects to the cluster
-    via CodeFlare SDK during __init__, and all subsequent operations automatically
-    use the cluster connection without repeated ray.init() calls.
+    This wrapper uses CodeFlare's TLS certificate generation to establish a direct
+    Ray connection to the KubeRay cluster, allowing native Ray operations to run remotely.
     """
 
     def __init__(self, config: Optional[Union[Dict[str, Any], object]] = None):
-        """
-        Initialize the Ray wrapper.
-
-        Args:
-            config: Ray configuration object (RayOfflineStoreConfig, RayComputeEngineConfig, or dict)
-        """
+        """Initialize the CodeFlare Ray wrapper with TLS-based Ray connection."""
         self.config_manager = RayConfigManager(config or {})
         self.execution_mode = self.config_manager.determine_execution_mode()
         self.use_kuberay = self.execution_mode == RayExecutionMode.KUBERAY
@@ -58,550 +212,154 @@ class CodeFlareRayWrapper:
         self.auth_server = kuberay_config.get("auth_server")
         self.skip_tls = kuberay_config.get("skip_tls", False)
 
-        # Connection timeout and retry settings
-        self.connection_timeout = kuberay_config.get(
-            "connection_timeout", 60
-        )  # seconds
-        self.max_retries = kuberay_config.get("max_retries", 3)
-        self.retry_delay = kuberay_config.get("retry_delay", 5)  # seconds
-
         self.cluster = None
         self._ray_initialized = False
-        self._authenticated = False  # Track authentication status
-        self._job_submission_mode = False  # Track if we're using job submission
-        self.job_client = None  # CodeFlare job client
 
         logger.info(
-            f"Ray wrapper initialized in {'KubeRay' if self.use_kuberay else 'client-side'} mode"
+            f"CodeFlare Ray wrapper initialized for cluster: {self.cluster_name}"
         )
 
-        # Log configuration details for debugging
+        # Initialize connection if using KubeRay
         if self.use_kuberay:
-            logger.info("KubeRay configuration:")
-            logger.info(f"  - Cluster name: {self.cluster_name}")
-            logger.info(f"  - Namespace: {self.namespace}")
-            logger.info(f"  - Connection timeout: {self.connection_timeout}s")
-            logger.info(f"  - Max retries: {self.max_retries}")
-            logger.info(f"  - Retry delay: {self.retry_delay}s")
-            logger.info(f"  - Auth configured: {'Yes' if self.auth_token else 'No'}")
-            logger.info(f"  - Skip TLS: {self.skip_tls}")
+            if not self._authenticate_codeflare():
+                raise RuntimeError("CodeFlare authentication failed")
+            if not self._setup_ray_connection():
+                raise RuntimeError("Ray connection setup failed")
 
-            # Log Ray version for debugging compatibility issues
-            try:
-                logger.info(f"  - Ray version: {ray.__version__}")
-            except Exception:
-                logger.debug("Could not determine Ray version")
-
-        # Initialize Ray connection once if using KubeRay
-        if self.use_kuberay:
-            self._ensure_ray_connection()
-
-    def _get_cluster(self) -> Optional[Cluster]:
-        """Get or connect to existing cluster."""
-        if not self.use_kuberay:
-            return None
-
-        if self.cluster is None:
-            try:
-                auth_result = self._authenticate_codeflare()
-                if auth_result is False:  # Explicitly failed authentication
-                    logger.warning("Authentication failed, cannot get cluster")
-                    return None
-
-                # Now try to get existing cluster after authentication
-                self.cluster = get_cluster(
-                    cluster_name=self.cluster_name, namespace=self.namespace
-                )
-                logger.info(
-                    f"✓ Connected to existing KubeRay cluster: {self.cluster_name}"
-                )
-
-            except Exception as e:
-                logger.warning(f"Could not connect to existing cluster: {e}")
-                return None
-
-        return self.cluster
-
-    def _authenticate_codeflare(self) -> Optional[bool]:
-        """
-        Authenticate with CodeFlare SDK using token authentication.
-        Returns:
-            Optional[bool]: True if authentication is successful, False if failed, None if no auth config
-        """
-        if not self.use_kuberay or not CODEFLARE_AVAILABLE:
-            return True  # No authentication needed for non-KubeRay mode
-
-        # Check if already authenticated
-        if self._authenticated:
-            logger.debug("CodeFlare SDK already authenticated")
-            return True
-
-        if not self.auth_token:
-            logger.info(
-                "No authentication token provided for KubeRay mode - attempting without auth"
-            )
-            return None
-
-        if not self.auth_server:
-            logger.info(
-                "No authentication server provided for KubeRay mode - attempting without auth"
-            )
-            return None
-
+    def _authenticate_codeflare(self) -> bool:
+        """Authenticate with CodeFlare SDK."""
         try:
-            logger.info("Authenticating with CodeFlare SDK using token authentication")
-            logger.info(f"Auth server: {self.auth_server}")
-            logger.info(f"Skip TLS: {self.skip_tls}")
+            from codeflare_sdk import TokenAuthentication
 
             auth = TokenAuthentication(
-                token=self.auth_token, server=self.auth_server, skip_tls=self.skip_tls
+                token=self.auth_token,
+                server=self.auth_server,
+                skip_tls=self.skip_tls,
             )
-
             auth.login()
             logger.info("✓ CodeFlare SDK authentication successful")
-            self._authenticated = True  # Mark as authenticated
             return True
-
         except Exception as e:
             logger.error(f"✗ CodeFlare SDK authentication failed: {e}")
             return False
 
-    def _ensure_ray_connection(self) -> bool:
-        """
-        Ensure Ray is connected to the appropriate cluster.
-        This is called once during initialization for KubeRay mode.
-
-        Returns:
-            bool: True if connection is successful, False otherwise
-        """
-        if self._ray_initialized:
-            return True
-
-        if not self.use_kuberay:
-            # For client-side mode, let Ray handle initialization
-            self._ray_initialized = True
-            return True
-
-        logger.info(f"Attempting to connect to KubeRay cluster: {self.cluster_name}")
-
-        # Attempt connection with retry logic
-        for attempt in range(self.max_retries):
-            try:
-                cluster = self._get_cluster()
-                if cluster:
-                    cluster_uri = cluster.cluster_uri()
-                    logger.info(
-                        f"Connecting to KubeRay cluster at: {cluster_uri} (attempt {attempt + 1}/{self.max_retries})"
-                    )
-
-                    # Try to get external endpoint if available
-                    print(f"🚨 CRITICAL: Default cluster URI: {cluster_uri}")
-                    try:
-                        # Check if there's an external endpoint available
-                        if hasattr(cluster, "cluster_dashboard_uri"):
-                            dashboard_uri = cluster.cluster_dashboard_uri()
-                            print(f"🚨 CRITICAL: Dashboard URI: {dashboard_uri}")
-
-                        # Log cluster status for debugging
-                        if hasattr(cluster, "status"):
-                            status = cluster.status()
-                            print(f"🚨 CRITICAL: Cluster status: {status}")
-                    except Exception as e:
-                        print(
-                            f"🚨 CRITICAL: Could not get additional cluster info: {e}"
-                        )
-
-                    # Test cluster connectivity before Ray connection
-                    if not self._test_cluster_connectivity(cluster_uri):
-                        if attempt < self.max_retries - 1:
-                            logger.warning(
-                                f"Cluster connectivity test failed, retrying in {self.retry_delay} seconds..."
-                            )
-                            time.sleep(self.retry_delay)
-                            continue
-                        else:
-                            logger.warning(
-                                "All connectivity tests failed, falling back to local Ray cluster"
-                            )
-                            self._ray_initialized = True
-                            return False
-
-                    # Prepare Ray init kwargs with timeout settings
-                    # Try to connect directly to head node instead of using Ray Client
-
-                    # Extract host and port from cluster URI
-                    import urllib.parse
-
-                    parsed_uri = urllib.parse.urlparse(cluster_uri)
-
-                    if parsed_uri.scheme == "ray":
-                        # Ray clusters typically use different ports for different services:
-                        # - 10001: Ray Client port (not for direct connection)
-                        # - 6379: GCS/Redis port (for direct connection)
-                        # - 8265: Dashboard port
-
-                        hostname = parsed_uri.hostname
-                        original_port = parsed_uri.port
-
-                        print(f"🚨 CRITICAL: Original Ray URI: {cluster_uri}")
-                        print(
-                            f"🚨 CRITICAL: Hostname: {hostname}, Original port: {original_port}"
-                        )
-
-                        # Try Ray GCS port first (6379 is the standard GCS/Redis port)
-                        possible_ports = [
-                            6379,
-                            original_port,
-                        ]  # 6379 is GCS, 10001 is client
-
-                        direct_address = None
-                        for gcs_port in possible_ports:
-                            test_address = f"{hostname}:{gcs_port}"
-                            print(
-                                f"🚨 CRITICAL: Testing Ray GCS connection to: {test_address}"
-                            )
-
-                            # Test basic connectivity to this port
-                            if self._test_cluster_connectivity(f"ray://{test_address}"):
-                                print(
-                                    f"🚨 CRITICAL: ✅ Port {gcs_port} is reachable, using for Ray connection"
-                                )
-                                direct_address = test_address
-                                break
-                            else:
-                                print(f"🚨 CRITICAL: ❌ Port {gcs_port} not reachable")
-
-                        # Fallback to original port if none work
-                        if not direct_address:
-                            direct_address = f"{hostname}:{original_port}"
-                            print(
-                                f"🚨 CRITICAL: Using fallback address: {direct_address}"
-                            )
-
-                        ray_kwargs = {
-                            "address": direct_address,
-                            "ignore_reinit_error": True,
-                            "log_to_driver": True,
-                        }
-                    else:
-                        # Fallback to original URI
-                        ray_kwargs = {
-                            "address": cluster_uri,
-                            "ignore_reinit_error": True,
-                            "log_to_driver": True,
-                        }
-
-                    # Add authentication token if available
-                    if self.auth_token:
-                        logger.info("Using authentication token for Ray connection")
-                        ray_kwargs["_redis_password"] = self.auth_token
-
-                    print("🚨 CRITICAL: Ray connection parameters:")
-                    print(f"🚨 CRITICAL: cluster_uri = {cluster_uri}")
-                    print(f"🚨 CRITICAL: ray_kwargs = {ray_kwargs}")
-                    print(
-                        f"🚨 CRITICAL: connection_timeout = {self.connection_timeout}"
-                    )
-                    print(f"🚨 CRITICAL: max_retries = {self.max_retries}")
-                    print(f"🚨 CRITICAL: retry_delay = {self.retry_delay}")
-
-                    # Test network connectivity first
-                    print("🚨 CRITICAL: Testing network connectivity...")
-                    if self._test_cluster_connectivity(cluster_uri):
-                        print("🚨 CRITICAL: ✅ Network connectivity test PASSED")
-                    else:
-                        print("🚨 CRITICAL: ❌ Network connectivity test FAILED")
-
-                    # Use CodeFlare SDK's Job Submission Architecture
-                    print("🚨 CRITICAL: Setting up CodeFlare Job Submission Client...")
-                    try:
-                        # Use CodeFlare's job submission architecture instead of direct ray.init()
-                        self.job_client = cluster.job_client
-                        print("🚨 CRITICAL: ✅ CodeFlare Job Submission Client ready!")
-                        logger.info(
-                            f"✓ Successfully set up job client for KubeRay cluster: {self.cluster_name}"
-                        )
-                        self._ray_initialized = True
-                        self._job_submission_mode = (
-                            True  # Flag to indicate we're using job submission
-                        )
-                        return True
-                    except Exception as job_client_error:
-                        print(
-                            f"🚨 CRITICAL: ❌ CodeFlare Job Client setup failed: {job_client_error}"
-                        )
-                        print("🚨 CRITICAL: Falling back to direct Ray connection...")
-
-                    # Fallback to direct Ray initialization
-                    print("🚨 CRITICAL: Starting direct Ray initialization...")
-                    success = self._init_ray_with_timeout(ray_kwargs)
-                    if success:
-                        logger.info(
-                            f"✓ Successfully connected to KubeRay cluster: {self.cluster_name}"
-                        )
-                        self._ray_initialized = True
-                        return True
-                    else:
-                        if attempt < self.max_retries - 1:
-                            logger.warning(
-                                f"Ray connection failed, retrying in {self.retry_delay} seconds..."
-                            )
-                            time.sleep(self.retry_delay)
-                            continue
-                        else:
-                            logger.warning(
-                                "All Ray connection attempts failed, falling back to local Ray cluster"
-                            )
-                            self._ray_initialized = True
-                            return False
-                else:
-                    logger.warning(
-                        f"✗ KubeRay cluster '{self.cluster_name}' not found in namespace '{self.namespace}'"
-                    )
-                    logger.warning("Falling back to local Ray cluster")
-                    self._ray_initialized = True
-                    return False
-            except Exception as e:
-                if attempt < self.max_retries - 1:
-                    logger.warning(
-                        f"Failed to connect to KubeRay cluster '{self.cluster_name}' (attempt {attempt + 1}): {e}"
-                    )
-                    logger.warning(f"Retrying in {self.retry_delay} seconds...")
-                    time.sleep(self.retry_delay)
-                else:
-                    logger.warning(
-                        f"✗ All attempts failed to connect to KubeRay cluster '{self.cluster_name}': {e}"
-                    )
-                    logger.warning("Falling back to local Ray cluster")
-                    self._ray_initialized = True
-                    return False
-
-        return False
-
-    def from_pandas(self, df: pd.DataFrame) -> Any:
-        """Create Ray Dataset from pandas DataFrame."""
-        return ray.data.from_pandas(df)
-
-    def from_arrow(self, table: pa.Table) -> Any:
-        """Create Ray Dataset from PyArrow Table."""
-        return ray.data.from_arrow(table)
-
-    def read_parquet(self, path: Union[str, List[str]]) -> Any:
-        """Read parquet files into Ray Dataset."""
-        return ray.data.read_parquet(path)
-
-    def read_csv(self, path: Union[str, List[str]]) -> Any:
-        """Read CSV files into Ray Dataset."""
-        return ray.data.read_csv(path)
-
-    def to_pandas(self, dataset: Any) -> pd.DataFrame:
-        """Convert Ray Dataset to pandas DataFrame."""
-        return dataset.to_pandas()
-
-    def to_arrow(self, dataset: Any) -> pa.Table:
-        """Convert Ray Dataset to PyArrow Table."""
-        if hasattr(dataset, "to_arrow"):
-            return dataset.to_arrow()
-        else:
-            df = dataset.to_pandas()
-            return pa.Table.from_pandas(df)
-
-    def _test_cluster_connectivity(self, cluster_uri: str) -> bool:
-        """
-        Test cluster connectivity before attempting Ray connection.
-        Args:
-            cluster_uri: The cluster URI to test
-        Returns:
-            bool: True if cluster is reachable, False otherwise
-        """
+    def _setup_ray_connection(self) -> bool:
+        """Set up direct Ray connection with TLS certificates."""
         try:
-            import socket
-            import urllib.parse
+            from codeflare_sdk import generate_cert, get_cluster
 
-            # Parse the cluster URI to get host and port
-            parsed = urllib.parse.urlparse(cluster_uri)
-            if not parsed.hostname or not parsed.port:
-                logger.warning(f"Invalid cluster URI format: {cluster_uri}")
-                return False
+            # Get existing cluster
+            self.cluster = get_cluster(
+                cluster_name=self.cluster_name,
+                namespace=self.namespace,
+            )
 
-            # Test socket connection with timeout
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(10)  # 10 second timeout for connectivity test
+            # Generate TLS certificates for secure Ray connection
+            logger.info("Generating TLS certificates for Ray connection")
+            generate_cert.generate_tls_cert(self.cluster_name, self.namespace)
+            generate_cert.export_env(self.cluster_name, self.namespace)
 
-            try:
-                result = sock.connect_ex((parsed.hostname, parsed.port))
-                return result == 0
-            finally:
-                sock.close()
+            # Initialize Ray with direct connection to cluster
+            if self.cluster is None:
+                raise RuntimeError("Cluster not available")
+
+            cluster_uri = self.cluster.cluster_uri()
+            logger.info(f"Connecting to Ray cluster: {cluster_uri}")
+
+            # Ray will now run operations directly on the remote KubeRay cluster
+            ray.init(
+                address=cluster_uri, ignore_reinit_error=True, logging_level="INFO"
+            )
+
+            self._ray_initialized = True
+            logger.info(f"✓ Ray connected successfully to cluster: {self.cluster_name}")
+            return True
 
         except Exception as e:
-            logger.debug(f"Cluster connectivity test failed: {e}")
+            logger.error(f"✗ Ray connection setup failed: {e}")
             return False
 
-    def _init_ray_with_timeout(self, ray_kwargs: Dict[str, Any]) -> bool:
-        """
-        Initialize Ray with timeout handling.
-        Args:
-            ray_kwargs: Ray initialization arguments
-        Returns:
-            bool: True if initialization successful, False otherwise
-        """
-        import threading
+    # Ray Data API methods - wrapped in @ray.remote to execute on cluster workers
+    def read_parquet(self, path: Union[str, List[str]]) -> Any:
+        """Read parquet files - runs remotely on KubeRay cluster workers."""
 
-        success = False
-        exception = None
+        @ray.remote
+        def _remote_read_parquet(file_path):
+            import ray
 
-        def init_ray():
-            nonlocal success, exception
-            try:
-                # Clean up any existing Ray instance first
-                if ray.is_initialized():
-                    ray.shutdown()
+            return ray.data.read_parquet(file_path)
 
-                ray.init(**ray_kwargs)
-                success = True
-            except Exception as e:
-                exception = e
+        return RemoteDatasetProxy(ray.get(_remote_read_parquet.remote(path)))
 
-        # Start Ray initialization in a separate thread
-        init_thread = threading.Thread(target=init_ray)
-        init_thread.daemon = True
-        init_thread.start()
+    def read_csv(self, path: Union[str, List[str]]) -> Any:
+        """Read CSV files - runs remotely on KubeRay cluster workers."""
 
-        # Wait for the thread to complete or timeout
-        init_thread.join(timeout=self.connection_timeout)
+        @ray.remote
+        def _remote_read_csv(file_path):
+            import ray
 
-        if init_thread.is_alive():
-            logger.warning(
-                f"Ray initialization timed out after {self.connection_timeout} seconds"
-            )
-            # Force cleanup of any partial Ray state
-            try:
-                if ray.is_initialized():
-                    ray.shutdown()
-            except Exception as e:
-                logger.warning(f"Error shutting down Ray: {e}")
-            return False
+            return ray.data.read_csv(file_path)
 
-        if exception:
-            # Check if it's a version compatibility issue
-            if "unexpected kwargs" in str(exception):
-                logger.warning(f"Ray version compatibility issue: {exception}")
-                logger.info("Attempting connection with basic parameters...")
+        return RemoteDatasetProxy(ray.get(_remote_read_csv.remote(path)))
 
-                # Try with minimal parameters for better compatibility
-                basic_kwargs = {
-                    "address": ray_kwargs["address"],
-                    "ignore_reinit_error": True,
-                }
+    def from_pandas(self, df: pd.DataFrame) -> Any:
+        """Create dataset from pandas DataFrame - runs remotely on KubeRay cluster."""
 
-                # Add authentication if it was in the original request and seems safe
-                if "_redis_password" in ray_kwargs and "redis_password" not in str(
-                    exception
-                ):
-                    basic_kwargs["_redis_password"] = ray_kwargs["_redis_password"]
+        @ray.remote
+        def _remote_from_pandas(dataframe):
+            import ray
 
-                try:
-                    if ray.is_initialized():
-                        ray.shutdown()
-                    ray.init(**basic_kwargs)
-                    logger.info("✓ Ray connection successful with basic parameters")
-                    return True
-                except Exception as basic_exception:
-                    logger.warning(
-                        f"Basic Ray connection also failed: {basic_exception}"
-                    )
+            return ray.data.from_pandas(dataframe)
 
-                    # Try one more time without any authentication
-                    if "_redis_password" in basic_kwargs:
-                        logger.info("Trying connection without authentication...")
-                        minimal_kwargs = {
-                            "address": ray_kwargs["address"],
-                            "ignore_reinit_error": True,
-                        }
-                        try:
-                            if ray.is_initialized():
-                                ray.shutdown()
-                            ray.init(**minimal_kwargs)
-                            logger.info(
-                                "✓ Ray connection successful without authentication"
-                            )
-                            return True
-                        except Exception as minimal_exception:
-                            logger.warning(
-                                f"Minimal Ray connection also failed: {minimal_exception}"
-                            )
+        return RemoteDatasetProxy(ray.get(_remote_from_pandas.remote(df)))
 
-                    return False
-            else:
-                logger.warning(f"Ray initialization failed: {exception}")
-                return False
+    def from_arrow(self, table: pa.Table) -> Any:
+        """Create dataset from PyArrow table - runs remotely on KubeRay cluster."""
 
-        return success
+        @ray.remote
+        def _remote_from_arrow(arrow_table):
+            import ray
 
-    def cleanup(self):
-        """Clean up resources."""
-        if self.cluster:
-            try:
-                self.cluster.down()
-                logger.info("Cluster connection closed")
-            except Exception as e:
-                logger.warning(f"Error closing cluster connection: {e}")
+            return ray.data.from_arrow(arrow_table)
 
+        return RemoteDatasetProxy(ray.get(_remote_from_arrow.remote(table)))
 
-# Global instance for easy access
-_ray_wrapper = None
+    def to_pandas(self, dataset: Any) -> pd.DataFrame:
+        """Convert dataset to pandas DataFrame."""
+        if isinstance(dataset, RemoteDatasetProxy):
+            return dataset.to_pandas()
+        else:
+            return dataset.to_pandas()
+
+    def to_arrow(self, dataset: Any) -> pa.Table:
+        """Convert dataset to PyArrow Table."""
+        if isinstance(dataset, RemoteDatasetProxy):
+            return dataset.to_arrow()
+        elif hasattr(dataset, "to_arrow"):
+            return dataset.to_arrow()
+        else:
+            return pa.Table.from_pandas(dataset.to_pandas())
+
+    def is_initialized(self) -> bool:
+        """Check if Ray wrapper is initialized."""
+        return self._ray_initialized
 
 
 def get_ray_wrapper() -> CodeFlareRayWrapper:
-    """
-    Get the global CodeFlare Ray wrapper instance.
-    This wrapper should be initialized during Ray offline store or compute engine
-    initialization using initialize_ray_wrapper().
-
-    Returns:
-        CodeFlareRayWrapper instance
-
-    Raises:
-        RuntimeError: If wrapper hasn't been initialized
-    """
-    global _ray_wrapper
-
-    if _ray_wrapper is None:
-        # Fallback to default configuration if not initialized
-        logger.warning("Ray wrapper not initialized, using default configuration")
-        _ray_wrapper = CodeFlareRayWrapper()
-
-    return _ray_wrapper
+    """Get the global Ray wrapper instance."""
+    if _global_ray_wrapper is None:
+        raise RuntimeError(
+            "Ray wrapper not initialized. Call initialize_ray_wrapper_from_config() first."
+        )
+    return _global_ray_wrapper
 
 
-def initialize_ray_wrapper_from_config(config: Any) -> CodeFlareRayWrapper:
-    """
-    Initialize the global CodeFlare Ray wrapper from Ray store/engine config.
+def initialize_ray_wrapper_from_config(config) -> CodeFlareRayWrapper:
+    """Initialize Ray wrapper from Feast config."""
+    global _global_ray_wrapper
+    _global_ray_wrapper = CodeFlareRayWrapper(config)
+    return _global_ray_wrapper
 
-    Args:
-        config: RayOfflineStoreConfig or RayComputeEngineConfig instance
 
-    Returns:
-        CodeFlareRayWrapper instance
-    """
-    print("=" * 80)
-    print(
-        "🚨 CRITICAL: initialize_ray_wrapper_from_config() called - WRAPPER CHANGES APPLIED!"
-    )
-    print(f"🚨 CRITICAL: Config type: {type(config)}")
-    print("=" * 80)
-    logger.info("🎯 WRAPPER: initialize_ray_wrapper_from_config() called")
-    logger.info(f"🎯 WRAPPER: Config type: {type(config)}")
-    logger.info(f"🎯 WRAPPER: Config details: {config}")
-
-    global _ray_wrapper
-
-    # Use the new configuration manager approach
-    logger.info("🎯 WRAPPER: Creating CodeFlareRayWrapper instance")
-    print("🚨 CRITICAL: About to create CodeFlareRayWrapper instance")
-    _ray_wrapper = CodeFlareRayWrapper(config=config)
-    print("🚨 CRITICAL: CodeFlareRayWrapper instance created!")
-    logger.info("🎯 WRAPPER: CodeFlareRayWrapper created successfully")
-
-    return _ray_wrapper
+# Global wrapper instance
+_global_ray_wrapper: Optional[CodeFlareRayWrapper] = None

@@ -1,16 +1,39 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 from ray.data import Dataset
 
+# Import RemoteDatasetProxy to handle isinstance checks
+try:
+    from feast.infra.codeflare_ray_wrapper import RemoteDatasetProxy
+
+    REMOTE_DATASET_PROXY_AVAILABLE = True
+except ImportError:
+    # Fallback for when codeflare_ray_wrapper is not available
+    RemoteDatasetProxy = None  # type: ignore
+    REMOTE_DATASET_PROXY_AVAILABLE = False
+
+
+def _is_ray_dataset(data: Any) -> bool:
+    """Check if data is a Ray Dataset or RemoteDatasetProxy."""
+    if isinstance(data, Dataset):
+        return True
+    if (
+        REMOTE_DATASET_PROXY_AVAILABLE
+        and RemoteDatasetProxy is not None
+        and isinstance(data, RemoteDatasetProxy)
+    ):
+        return True
+    return False
+
 
 def normalize_timestamp_columns(
-    data: Union[pd.DataFrame, Dataset],
+    data: Union[pd.DataFrame, Dataset, Any],
     columns: Union[str, List[str]],
     inplace: bool = False,
     exclude_columns: Optional[List[str]] = None,
-) -> Union[pd.DataFrame, Dataset]:
+) -> Union[pd.DataFrame, Dataset, Any]:
     column_list = [columns] if isinstance(columns, str) else columns
     exclude_columns = exclude_columns or []
 
@@ -21,7 +44,7 @@ def normalize_timestamp_columns(
             .astype("datetime64[ns, UTC]")
         )
 
-    if isinstance(data, Dataset):
+    if _is_ray_dataset(data):
 
         def normalize_batch(batch: pd.DataFrame) -> pd.DataFrame:
             for column in column_list:
@@ -35,6 +58,8 @@ def normalize_timestamp_columns(
 
         return data.map_batches(normalize_batch, batch_format="pandas")
     else:
+        # Must be pandas DataFrame in else branch
+        assert isinstance(data, pd.DataFrame)
         if not inplace:
             data = data.copy()
         for column in column_list:
@@ -44,13 +69,13 @@ def normalize_timestamp_columns(
 
 
 def ensure_timestamp_compatibility(
-    data: Union[pd.DataFrame, Dataset],
+    data: Union[pd.DataFrame, Dataset, Any],
     timestamp_fields: List[str],
     inplace: bool = False,
-) -> Union[pd.DataFrame, Dataset]:
+) -> Union[pd.DataFrame, Dataset, Any]:
     from feast.utils import make_df_tzaware
 
-    if isinstance(data, Dataset):
+    if _is_ray_dataset(data):
 
         def ensure_compatibility(batch: pd.DataFrame) -> pd.DataFrame:
             batch = make_df_tzaware(batch)
@@ -65,6 +90,8 @@ def ensure_timestamp_compatibility(
 
         return data.map_batches(ensure_compatibility, batch_format="pandas")
     else:
+        # Must be pandas DataFrame in else branch
+        assert isinstance(data, pd.DataFrame)
         if not inplace:
             data = data.copy()
         from feast.utils import make_df_tzaware
@@ -77,22 +104,23 @@ def ensure_timestamp_compatibility(
 
 
 def apply_field_mapping(
-    data: Union[pd.DataFrame, Dataset], field_mapping: Dict[str, str]
-) -> Union[pd.DataFrame, Dataset]:
+    data: Union[pd.DataFrame, Dataset, Any], field_mapping: Dict[str, str]
+) -> Union[pd.DataFrame, Dataset, Any]:
     def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
         return df.rename(columns=field_mapping)
 
-    if isinstance(data, Dataset):
+    if _is_ray_dataset(data):
         return data.map_batches(rename_columns, batch_format="pandas")
     else:
+        assert isinstance(data, pd.DataFrame)
         return data.rename(columns=field_mapping)
 
 
 def deduplicate_by_keys_and_timestamp(
-    data: Union[pd.DataFrame, Dataset],
+    data: Union[pd.DataFrame, Dataset, Any],
     join_keys: List[str],
     timestamp_columns: List[str],
-) -> Union[pd.DataFrame, Dataset]:
+) -> Union[pd.DataFrame, Dataset, Any]:
     def deduplicate_batch(batch: pd.DataFrame) -> pd.DataFrame:
         if batch.empty:
             return batch
@@ -110,9 +138,10 @@ def deduplicate_by_keys_and_timestamp(
             return deduped_batch
         return batch
 
-    if isinstance(data, Dataset):
+    if _is_ray_dataset(data):
         return data.map_batches(deduplicate_batch, batch_format="pandas")
     else:
+        assert isinstance(data, pd.DataFrame)
         return deduplicate_batch(data)
 
 

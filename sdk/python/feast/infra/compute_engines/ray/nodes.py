@@ -13,6 +13,14 @@ from feast.aggregation import Aggregation
 from feast.data_source import DataSource
 from feast.feature_view_utils import get_transformation_function, has_transformation
 from feast.infra.codeflare_ray_wrapper import get_ray_wrapper
+
+try:
+    from feast.infra.codeflare_ray_wrapper import RemoteDatasetProxy
+
+    REMOTE_DATASET_PROXY_AVAILABLE = True
+except ImportError:
+    RemoteDatasetProxy = None  # type: ignore
+    REMOTE_DATASET_PROXY_AVAILABLE = False
 from feast.infra.common.serde import SerializedArtifacts
 from feast.infra.compute_engines.dag.context import ExecutionContext
 from feast.infra.compute_engines.dag.model import DAGFormat
@@ -31,6 +39,20 @@ from feast.infra.ray_shared_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_ray_dataset(data) -> bool:
+    """Check if data is a Ray Dataset or RemoteDatasetProxy."""
+    if isinstance(data, Dataset):
+        return True
+    if (
+        REMOTE_DATASET_PROXY_AVAILABLE
+        and RemoteDatasetProxy is not None
+        and isinstance(data, RemoteDatasetProxy)
+    ):
+        return True
+    return False
+
 
 # Entity timestamp alias for historical feature retrieval
 ENTITY_TS_ALIAS = "__entity_event_timestamp"
