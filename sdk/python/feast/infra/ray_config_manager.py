@@ -158,6 +158,17 @@ class RayConfigManager:
         ).lower() == "true" or kuberay_conf.get("skip_tls", False)
         config["skip_tls"] = skip_tls
 
+        # Add connection timeout and retry settings
+        config["connection_timeout"] = int(
+            os.getenv("FEAST_RAY_CONNECTION_TIMEOUT", "60")
+        ) or kuberay_conf.get("connection_timeout", 60)
+        config["max_retries"] = int(
+            os.getenv("FEAST_RAY_MAX_RETRIES", "3")
+        ) or kuberay_conf.get("max_retries", 3)
+        config["retry_delay"] = int(
+            os.getenv("FEAST_RAY_RETRY_DELAY", "5")
+        ) or kuberay_conf.get("retry_delay", 5)
+
         # Add any additional configuration from kuberay_conf
         for key, value in kuberay_conf.items():
             if key not in config:  # Don't override already processed keys

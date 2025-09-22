@@ -8,6 +8,7 @@ and all subsequent operations use ray.data directly without repeated initializat
 """
 
 import logging
+import time
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
@@ -57,12 +58,37 @@ class CodeFlareRayWrapper:
         self.auth_server = kuberay_config.get("auth_server")
         self.skip_tls = kuberay_config.get("skip_tls", False)
 
+        # Connection timeout and retry settings
+        self.connection_timeout = kuberay_config.get(
+            "connection_timeout", 60
+        )  # seconds
+        self.max_retries = kuberay_config.get("max_retries", 3)
+        self.retry_delay = kuberay_config.get("retry_delay", 5)  # seconds
+
         self.cluster = None
         self._ray_initialized = False
+        self._authenticated = False  # Track authentication status
 
         logger.info(
             f"Ray wrapper initialized in {'KubeRay' if self.use_kuberay else 'client-side'} mode"
         )
+
+        # Log configuration details for debugging
+        if self.use_kuberay:
+            logger.info("KubeRay configuration:")
+            logger.info(f"  - Cluster name: {self.cluster_name}")
+            logger.info(f"  - Namespace: {self.namespace}")
+            logger.info(f"  - Connection timeout: {self.connection_timeout}s")
+            logger.info(f"  - Max retries: {self.max_retries}")
+            logger.info(f"  - Retry delay: {self.retry_delay}s")
+            logger.info(f"  - Auth configured: {'Yes' if self.auth_token else 'No'}")
+            logger.info(f"  - Skip TLS: {self.skip_tls}")
+
+            # Log Ray version for debugging compatibility issues
+            try:
+                logger.info(f"  - Ray version: {ray.__version__}")
+            except Exception:
+                logger.debug("Could not determine Ray version")
 
         # Initialize Ray connection once if using KubeRay
         if self.use_kuberay:
@@ -75,16 +101,21 @@ class CodeFlareRayWrapper:
 
         if self.cluster is None:
             try:
-                # Try to get existing cluster first
+                auth_result = self._authenticate_codeflare()
+                if auth_result is False:  # Explicitly failed authentication
+                    logger.warning("Authentication failed, cannot get cluster")
+                    return None
+
+                # Now try to get existing cluster after authentication
                 self.cluster = get_cluster(
                     cluster_name=self.cluster_name, namespace=self.namespace
                 )
                 logger.info(
-                    f"Connected to existing KubeRay cluster: {self.cluster_name}"
+                    f"✓ Connected to existing KubeRay cluster: {self.cluster_name}"
                 )
 
             except Exception as e:
-                logger.debug(f"Could not connect to existing cluster: {e}")
+                logger.warning(f"Could not connect to existing cluster: {e}")
                 return None
 
         return self.cluster
@@ -97,6 +128,11 @@ class CodeFlareRayWrapper:
         """
         if not self.use_kuberay or not CODEFLARE_AVAILABLE:
             return True  # No authentication needed for non-KubeRay mode
+
+        # Check if already authenticated
+        if self._authenticated:
+            logger.debug("CodeFlare SDK already authenticated")
+            return True
 
         if not self.auth_token:
             logger.info(
@@ -113,6 +149,7 @@ class CodeFlareRayWrapper:
         try:
             logger.info("Authenticating with CodeFlare SDK using token authentication")
             logger.info(f"Auth server: {self.auth_server}")
+            logger.info(f"Skip TLS: {self.skip_tls}")
 
             auth = TokenAuthentication(
                 token=self.auth_token, server=self.auth_server, skip_tls=self.skip_tls
@@ -120,6 +157,7 @@ class CodeFlareRayWrapper:
 
             auth.login()
             logger.info("✓ CodeFlare SDK authentication successful")
+            self._authenticated = True  # Mark as authenticated
             return True
 
         except Exception as e:
@@ -144,57 +182,87 @@ class CodeFlareRayWrapper:
 
         logger.info(f"Attempting to connect to KubeRay cluster: {self.cluster_name}")
 
-        # First authenticate with CodeFlare SDK if needed
-        auth_result = self._authenticate_codeflare()
-        if auth_result is False:  # Explicitly failed (not just missing config)
-            logger.warning("Authentication failed, falling back to local Ray cluster")
-            self._ray_initialized = True
-            return False
-        elif auth_result is None:  # Missing auth config but might still work
-            logger.info(
-                "No authentication configured, attempting direct cluster connection"
-            )
+        # Attempt connection with retry logic
+        for attempt in range(self.max_retries):
+            try:
+                cluster = self._get_cluster()
+                if cluster:
+                    cluster_uri = cluster.cluster_uri()
+                    logger.info(
+                        f"Connecting to KubeRay cluster at: {cluster_uri} (attempt {attempt + 1}/{self.max_retries})"
+                    )
 
-        try:
-            cluster = self._get_cluster()
-            if cluster:
-                # Initialize Ray with the KubeRay cluster address
-                logger.info(
-                    f"Connecting to KubeRay cluster at: {cluster.cluster_uri()}"
-                )
+                    # Test cluster connectivity before Ray connection
+                    if not self._test_cluster_connectivity(cluster_uri):
+                        if attempt < self.max_retries - 1:
+                            logger.warning(
+                                f"Cluster connectivity test failed, retrying in {self.retry_delay} seconds..."
+                            )
+                            time.sleep(self.retry_delay)
+                            continue
+                        else:
+                            logger.warning(
+                                "All connectivity tests failed, falling back to local Ray cluster"
+                            )
+                            self._ray_initialized = True
+                            return False
 
-                # Prepare Ray init kwargs
-                ray_kwargs = {
-                    "address": cluster.cluster_uri(),
-                    "ignore_reinit_error": True,
-                    "log_to_driver": True,
-                }
+                    # Prepare Ray init kwargs with timeout settings
+                    ray_kwargs = {
+                        "address": cluster_uri,
+                        "ignore_reinit_error": True,
+                        "log_to_driver": True,
+                    }
 
-                # Add authentication token if available
-                if self.auth_token:
-                    logger.info("Using authentication token for Ray connection")
-                    ray_kwargs["_redis_password"] = self.auth_token
+                    # Add authentication token if available
+                    if self.auth_token:
+                        logger.info("Using authentication token for Ray connection")
+                        ray_kwargs["_redis_password"] = self.auth_token
 
-                ray.init(**ray_kwargs)
-                logger.info(
-                    f"✓ Successfully connected to KubeRay cluster: {self.cluster_name}"
-                )
-                self._ray_initialized = True
-                return True
-            else:
-                logger.warning(
-                    f"✗ KubeRay cluster '{self.cluster_name}' not found in namespace '{self.namespace}'"
-                )
-                logger.warning("Falling back to local Ray cluster")
-                self._ray_initialized = True
-                return False
-        except Exception as e:
-            logger.warning(
-                f"✗ Failed to connect to KubeRay cluster '{self.cluster_name}': {e}"
-            )
-            logger.warning("Falling back to local Ray cluster")
-            self._ray_initialized = True
-            return False
+                    # Initialize Ray with timeout
+                    success = self._init_ray_with_timeout(ray_kwargs)
+                    if success:
+                        logger.info(
+                            f"✓ Successfully connected to KubeRay cluster: {self.cluster_name}"
+                        )
+                        self._ray_initialized = True
+                        return True
+                    else:
+                        if attempt < self.max_retries - 1:
+                            logger.warning(
+                                f"Ray connection failed, retrying in {self.retry_delay} seconds..."
+                            )
+                            time.sleep(self.retry_delay)
+                            continue
+                        else:
+                            logger.warning(
+                                "All Ray connection attempts failed, falling back to local Ray cluster"
+                            )
+                            self._ray_initialized = True
+                            return False
+                else:
+                    logger.warning(
+                        f"✗ KubeRay cluster '{self.cluster_name}' not found in namespace '{self.namespace}'"
+                    )
+                    logger.warning("Falling back to local Ray cluster")
+                    self._ray_initialized = True
+                    return False
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    logger.warning(
+                        f"Failed to connect to KubeRay cluster '{self.cluster_name}' (attempt {attempt + 1}): {e}"
+                    )
+                    logger.warning(f"Retrying in {self.retry_delay} seconds...")
+                    time.sleep(self.retry_delay)
+                else:
+                    logger.warning(
+                        f"✗ All attempts failed to connect to KubeRay cluster '{self.cluster_name}': {e}"
+                    )
+                    logger.warning("Falling back to local Ray cluster")
+                    self._ray_initialized = True
+                    return False
+
+        return False
 
     def from_pandas(self, df: pd.DataFrame) -> Any:
         """Create Ray Dataset from pandas DataFrame."""
@@ -224,6 +292,139 @@ class CodeFlareRayWrapper:
             df = dataset.to_pandas()
             return pa.Table.from_pandas(df)
 
+    def _test_cluster_connectivity(self, cluster_uri: str) -> bool:
+        """
+        Test cluster connectivity before attempting Ray connection.
+        Args:
+            cluster_uri: The cluster URI to test
+        Returns:
+            bool: True if cluster is reachable, False otherwise
+        """
+        try:
+            import socket
+            import urllib.parse
+
+            # Parse the cluster URI to get host and port
+            parsed = urllib.parse.urlparse(cluster_uri)
+            if not parsed.hostname or not parsed.port:
+                logger.warning(f"Invalid cluster URI format: {cluster_uri}")
+                return False
+
+            # Test socket connection with timeout
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(10)  # 10 second timeout for connectivity test
+
+            try:
+                result = sock.connect_ex((parsed.hostname, parsed.port))
+                return result == 0
+            finally:
+                sock.close()
+
+        except Exception as e:
+            logger.debug(f"Cluster connectivity test failed: {e}")
+            return False
+
+    def _init_ray_with_timeout(self, ray_kwargs: Dict[str, Any]) -> bool:
+        """
+        Initialize Ray with timeout handling.
+        Args:
+            ray_kwargs: Ray initialization arguments
+        Returns:
+            bool: True if initialization successful, False otherwise
+        """
+        import threading
+
+        success = False
+        exception = None
+
+        def init_ray():
+            nonlocal success, exception
+            try:
+                # Clean up any existing Ray instance first
+                if ray.is_initialized():
+                    ray.shutdown()
+
+                ray.init(**ray_kwargs)
+                success = True
+            except Exception as e:
+                exception = e
+
+        # Start Ray initialization in a separate thread
+        init_thread = threading.Thread(target=init_ray)
+        init_thread.daemon = True
+        init_thread.start()
+
+        # Wait for the thread to complete or timeout
+        init_thread.join(timeout=self.connection_timeout)
+
+        if init_thread.is_alive():
+            logger.warning(
+                f"Ray initialization timed out after {self.connection_timeout} seconds"
+            )
+            # Force cleanup of any partial Ray state
+            try:
+                if ray.is_initialized():
+                    ray.shutdown()
+            except Exception as e:
+                logger.warning(f"Error shutting down Ray: {e}")
+            return False
+
+        if exception:
+            # Check if it's a version compatibility issue
+            if "unexpected kwargs" in str(exception):
+                logger.warning(f"Ray version compatibility issue: {exception}")
+                logger.info("Attempting connection with basic parameters...")
+
+                # Try with minimal parameters for better compatibility
+                basic_kwargs = {
+                    "address": ray_kwargs["address"],
+                    "ignore_reinit_error": True,
+                }
+
+                # Add authentication if it was in the original request and seems safe
+                if "_redis_password" in ray_kwargs and "redis_password" not in str(
+                    exception
+                ):
+                    basic_kwargs["_redis_password"] = ray_kwargs["_redis_password"]
+
+                try:
+                    if ray.is_initialized():
+                        ray.shutdown()
+                    ray.init(**basic_kwargs)
+                    logger.info("✓ Ray connection successful with basic parameters")
+                    return True
+                except Exception as basic_exception:
+                    logger.warning(
+                        f"Basic Ray connection also failed: {basic_exception}"
+                    )
+
+                    # Try one more time without any authentication
+                    if "_redis_password" in basic_kwargs:
+                        logger.info("Trying connection without authentication...")
+                        minimal_kwargs = {
+                            "address": ray_kwargs["address"],
+                            "ignore_reinit_error": True,
+                        }
+                        try:
+                            if ray.is_initialized():
+                                ray.shutdown()
+                            ray.init(**minimal_kwargs)
+                            logger.info(
+                                "✓ Ray connection successful without authentication"
+                            )
+                            return True
+                        except Exception as minimal_exception:
+                            logger.warning(
+                                f"Minimal Ray connection also failed: {minimal_exception}"
+                            )
+
+                    return False
+            else:
+                logger.warning(f"Ray initialization failed: {exception}")
+                return False
+
+        return success
+
     def cleanup(self):
         """Clean up resources."""
         if self.cluster:
@@ -241,7 +442,6 @@ _ray_wrapper = None
 def get_ray_wrapper() -> CodeFlareRayWrapper:
     """
     Get the global CodeFlare Ray wrapper instance.
-
     This wrapper should be initialized during Ray offline store or compute engine
     initialization using initialize_ray_wrapper().
 

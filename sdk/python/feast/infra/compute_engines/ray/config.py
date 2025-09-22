@@ -80,3 +80,12 @@ class RayComputeEngineConfig(FeastConfigBaseModel):
 
     enable_ray_logging: bool = False
     """Enable Ray progress bars and verbose logging"""
+
+    connection_timeout: Optional[int] = 60
+    """Timeout for Ray client connection in seconds (default: 60)"""
+
+    max_retries: Optional[int] = 3
+    """Maximum number of connection retry attempts (default: 3)"""
+
+    retry_delay: Optional[int] = 5
+    """Delay between retry attempts in seconds (default: 5)"""

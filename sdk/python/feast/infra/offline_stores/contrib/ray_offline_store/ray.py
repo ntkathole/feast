@@ -354,6 +354,15 @@ class RayOfflineStoreConfig(FeastConfigBaseModel):
     execution_timeout_seconds: Optional[int] = None
     """Timeout for Ray operations in seconds (None for no timeout)"""
 
+    connection_timeout: Optional[int] = 60
+    """Timeout for Ray client connection in seconds (default: 60)"""
+
+    max_retries: Optional[int] = 3
+    """Maximum number of connection retry attempts (default: 3)"""
+
+    retry_delay: Optional[int] = 5
+    """Delay between retry attempts in seconds (default: 5)"""
+
 
 class RayResourceManager:
     """
@@ -1244,6 +1253,25 @@ class RayOfflineStore(OfflineStore):
                 if not ray_conf.get("enable_ray_logging", False):
                     RayOfflineStore._suppress_ray_logging()
 
+        # Check if KubeRay is configured - if so, let the CodeFlare wrapper handle initialization
+        if (
+            ray_config
+            and isinstance(ray_config, RayOfflineStoreConfig)
+            and (
+                ray_config.use_kuberay
+                or (
+                    ray_config.kuberay_conf
+                    and ray_config.kuberay_conf.get("cluster_name")
+                )
+            )
+        ):
+            logger.info(
+                "KubeRay configuration detected - delegating to CodeFlare wrapper"
+            )
+            # Initialize the wrapper which will handle KubeRay authentication and connection
+            initialize_ray_wrapper_from_config(ray_config)
+            return
+
         if not ray.is_initialized():
             ray_init_kwargs: Dict[str, Any] = {
                 "ignore_reinit_error": True,
@@ -1309,13 +1337,22 @@ class RayOfflineStore(OfflineStore):
     def _init_ray(self, config: RepoConfig) -> None:
         ray_config = config.offline_store
         assert isinstance(ray_config, RayOfflineStoreConfig)
+
+        # Check if KubeRay is configured
+        is_kuberay = ray_config.use_kuberay or (
+            ray_config.kuberay_conf and ray_config.kuberay_conf.get("cluster_name")
+        )
+
+        # Initialize Ray (this will delegate to CodeFlare wrapper if KubeRay is configured)
         RayOfflineStore._ensure_ray_initialized(config)
 
         ray_conf = ray_config.ray_conf or {}
         if not ray_conf.get("enable_ray_logging", False):
             RayOfflineStore._suppress_ray_logging()
 
-        initialize_ray_wrapper_from_config(ray_config)
+        # Only initialize wrapper if not already done by _ensure_ray_initialized for KubeRay
+        if not is_kuberay:
+            initialize_ray_wrapper_from_config(ray_config)
 
         if self._resource_manager is None:
             self._resource_manager = RayResourceManager(ray_config)
