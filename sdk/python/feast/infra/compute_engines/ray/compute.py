@@ -81,6 +81,7 @@ class RayComputeEngine(ComputeEngine):
 
     def _ensure_ray_initialized(self):
         """Ensure Ray is initialized with proper configuration."""
+        print("🚨 CRITICAL: _ensure_ray_initialized() called in COMPUTE ENGINE!")
         logger.info("Ensuring Ray is initialized")
 
         # Check if KubeRay is configured - if so, let the CodeFlare wrapper handle initialization
@@ -99,9 +100,8 @@ class RayComputeEngine(ComputeEngine):
             logger.info("CodeFlare wrapper initialization completed")
             return
         else:
-            print("🚨 CRITICAL: NO KUBERAY DETECTED! Using standard Ray init")
             logger.info(
-                "❌ ENGINE: No KubeRay configuration detected, proceeding with standard Ray init"
+                "No KubeRay configuration detected, proceeding with standard Ray init"
             )
 
         if not ray.is_initialized():
