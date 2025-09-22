@@ -1193,6 +1193,7 @@ class RayRetrievalJob(RetrievalJob):
 
 class RayOfflineStore(OfflineStore):
     def __init__(self) -> None:
+        logger.info("🏪 STORE: RayOfflineStore.__init__() called")
         self._staging_location: Optional[str] = None
         self._ray_initialized: bool = False
         self._resource_manager: Optional[RayResourceManager] = None
@@ -1245,16 +1246,41 @@ class RayOfflineStore(OfflineStore):
     @staticmethod
     def _ensure_ray_initialized(config: Optional[RepoConfig] = None) -> None:
         """Ensure Ray is initialized with proper configuration."""
+        logger.info("🔍 FLOW: _ensure_ray_initialized() called")
+        logger.info(f"🔍 FLOW: config parameter: {config}")
+
         ray_config = None
         if config and hasattr(config, "offline_store"):
             ray_config = config.offline_store
+            logger.info(f"🔍 FLOW: Found offline_store config: {ray_config}")
             if isinstance(ray_config, RayOfflineStoreConfig):
+                logger.info("🔍 FLOW: Config is RayOfflineStoreConfig instance")
                 ray_conf = ray_config.ray_conf or {}
                 if not ray_conf.get("enable_ray_logging", False):
                     RayOfflineStore._suppress_ray_logging()
+            else:
+                logger.info(
+                    f"🔍 FLOW: Config is NOT RayOfflineStoreConfig, type: {type(ray_config)}"
+                )
+        else:
+            logger.info("🔍 FLOW: No offline_store config found")
+
+        # Debug: Log configuration details
+        logger.info(f"🔧 DEBUG: Ray config type: {type(ray_config)}")
+        if ray_config and isinstance(ray_config, RayOfflineStoreConfig):
+            logger.info(f"🔧 DEBUG: use_kuberay = {ray_config.use_kuberay}")
+            logger.info(f"🔧 DEBUG: kuberay_conf = {ray_config.kuberay_conf}")
+            if ray_config.kuberay_conf:
+                logger.info(
+                    f"🔧 DEBUG: cluster_name = {ray_config.kuberay_conf.get('cluster_name')}"
+                )
+        else:
+            logger.info(
+                "🔧 DEBUG: Ray config is not RayOfflineStoreConfig - KubeRay detection will fail"
+            )
 
         # Check if KubeRay is configured - if so, let the CodeFlare wrapper handle initialization
-        if (
+        kuberay_detected = (
             ray_config
             and isinstance(ray_config, RayOfflineStoreConfig)
             and (
@@ -1264,13 +1290,24 @@ class RayOfflineStore(OfflineStore):
                     and ray_config.kuberay_conf.get("cluster_name")
                 )
             )
-        ):
+        )
+
+        logger.info(f"🔧 DEBUG: KubeRay detection result: {kuberay_detected}")
+
+        if kuberay_detected:
             logger.info(
-                "KubeRay configuration detected - delegating to CodeFlare wrapper"
+                "✅ FLOW: KubeRay configuration detected - delegating to CodeFlare wrapper"
             )
             # Initialize the wrapper which will handle KubeRay authentication and connection
             initialize_ray_wrapper_from_config(ray_config)
+            logger.info(
+                "✅ FLOW: CodeFlare wrapper initialization completed, returning"
+            )
             return
+        else:
+            logger.info(
+                "❌ FLOW: No KubeRay configuration detected, proceeding with standard Ray init"
+            )
 
         if not ray.is_initialized():
             ray_init_kwargs: Dict[str, Any] = {
@@ -1335,16 +1372,22 @@ class RayOfflineStore(OfflineStore):
                 )
 
     def _init_ray(self, config: RepoConfig) -> None:
+        logger.info("🚀 FLOW: _init_ray() called")
         ray_config = config.offline_store
+        logger.info(f"🚀 FLOW: Got offline_store config: {ray_config}")
         assert isinstance(ray_config, RayOfflineStoreConfig)
+        logger.info("🚀 FLOW: Config is RayOfflineStoreConfig instance")
 
         # Check if KubeRay is configured
         is_kuberay = ray_config.use_kuberay or (
             ray_config.kuberay_conf and ray_config.kuberay_conf.get("cluster_name")
         )
+        logger.info(f"🚀 FLOW: KubeRay detection in _init_ray: {is_kuberay}")
 
         # Initialize Ray (this will delegate to CodeFlare wrapper if KubeRay is configured)
+        logger.info("🚀 FLOW: Calling _ensure_ray_initialized()")
         RayOfflineStore._ensure_ray_initialized(config)
+        logger.info("🚀 FLOW: _ensure_ray_initialized() completed")
 
         ray_conf = ray_config.ray_conf or {}
         if not ray_conf.get("enable_ray_logging", False):
@@ -1352,7 +1395,12 @@ class RayOfflineStore(OfflineStore):
 
         # Only initialize wrapper if not already done by _ensure_ray_initialized for KubeRay
         if not is_kuberay:
+            logger.info("🚀 FLOW: Initializing wrapper for non-KubeRay mode")
             initialize_ray_wrapper_from_config(ray_config)
+        else:
+            logger.info(
+                "🚀 FLOW: Skipping wrapper initialization (already done for KubeRay)"
+            )
 
         if self._resource_manager is None:
             self._resource_manager = RayResourceManager(ray_config)

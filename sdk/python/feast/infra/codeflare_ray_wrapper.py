@@ -471,9 +471,15 @@ def initialize_ray_wrapper_from_config(config: Any) -> CodeFlareRayWrapper:
     Returns:
         CodeFlareRayWrapper instance
     """
+    logger.info("🎯 WRAPPER: initialize_ray_wrapper_from_config() called")
+    logger.info(f"🎯 WRAPPER: Config type: {type(config)}")
+    logger.info(f"🎯 WRAPPER: Config details: {config}")
+
     global _ray_wrapper
 
     # Use the new configuration manager approach
+    logger.info("🎯 WRAPPER: Creating CodeFlareRayWrapper instance")
     _ray_wrapper = CodeFlareRayWrapper(config=config)
+    logger.info("🎯 WRAPPER: CodeFlareRayWrapper created successfully")
 
     return _ray_wrapper
