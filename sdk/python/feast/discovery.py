@@ -12,26 +12,122 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 try:
+    import urllib3
     from kubernetes import client, config
     from kubernetes.client.rest import ApiException
 
     KUBERNETES_AVAILABLE = True
 except ImportError:
     KUBERNETES_AVAILABLE = False
+    urllib3 = None  # type: ignore
 
-from feast.feature_store import FeatureStore
 from feast.repo_config import load_repo_config
 
+if TYPE_CHECKING:
+    from feast.feature_store import FeatureStore
+
 logger = logging.getLogger(__name__)
+
+if urllib3 is not None:
+    urllib3.disable_warnings()
 
 # Constants matching the operator implementation
 NAMESPACE_REGISTRY_CONFIGMAP_NAME = "feast-configs-registry"
 NAMESPACE_REGISTRY_DATA_KEY = "namespaces"
 DEFAULT_KUBERNETES_NAMESPACE = "feast-operator-system"
 DEFAULT_OPENSHIFT_NAMESPACE = "redhat-ods-applications"
+
+_current_auth = None
+
+
+class ClusterTokenAuthentication:
+    """
+    Manages authentication session for cluster access.
+
+    This class provides a session-based authentication approach,
+    where you authenticate once and then use discovery functions without passing credentials.
+    """
+
+    def __init__(
+        self,
+        token: str,
+        server_url: str,
+        ca_cert: Optional[str] = None,
+        verify_ssl: bool = True,
+    ):
+        """
+        Initialize cluster authentication session.
+
+        Args:
+            token: Bearer token for authentication
+            server_url: Kubernetes API server URL
+            ca_cert: CA certificate for server verification (optional)
+            verify_ssl: Whether to verify SSL certificates (default: True)
+        """
+        self.token = token
+        self.server_url = server_url
+        self.ca_cert = ca_cert
+        self.verify_ssl = verify_ssl
+        self._discovery: Optional["FeastServerDiscovery"] = None
+        self._authenticated = False
+
+        self.login()
+
+    def login(self) -> None:
+        """Authenticate with the cluster and establish session."""
+        try:
+            self._discovery = FeastServerDiscovery(
+                token=self.token,
+                server_url=self.server_url,
+                ca_cert=self.ca_cert,
+                verify_ssl=self.verify_ssl,
+            )
+
+            self._discovery.get_servers()
+
+            global _current_auth
+            _current_auth = self
+
+            self._authenticated = True
+            logger.info("Successfully authenticated with cluster")
+
+        except Exception as e:
+            self._authenticated = False
+            raise RuntimeError(f"Failed to authenticate with cluster: {e}")
+
+    def logout(self) -> None:
+        """Logout and clear the authentication session."""
+        global _current_auth
+
+        self._authenticated = False
+        self._discovery = None
+        _current_auth = None
+
+        logger.info("Logged out from cluster")
+
+    def is_authenticated(self) -> bool:
+        """Check if currently authenticated."""
+        return self._authenticated
+
+    def get_discovery(self) -> "FeastServerDiscovery":
+        """Get the discovery client for this session."""
+        if not self._authenticated or not self._discovery:
+            raise RuntimeError("Not authenticated. Call login() first.")
+        assert self._discovery is not None
+        return self._discovery
+
+    def get_servers(
+        self, namespace_filter: Optional[str] = None
+    ) -> List["FeastServerInfo"]:
+        """Get servers using this authentication session."""
+        return self.get_discovery().get_servers(namespace_filter)
+
+    def connect_to_server(self, server_info: "FeastServerInfo") -> "FeatureStore":
+        """Connect to a server using this authentication session."""
+        return self.get_discovery().connect_to_server(server_info)
 
 
 @dataclass
@@ -58,10 +154,6 @@ class FeastServerInfo:
         """Get the offline store endpoint for this server."""
         return self.service_hostnames.get("offlineStore")
 
-    def get_ui_endpoint(self) -> Optional[str]:
-        """Get the UI endpoint for this server."""
-        return self.service_hostnames.get("ui")
-
 
 class FeastServerDiscovery:
     """
@@ -72,11 +164,22 @@ class FeastServerDiscovery:
     than the client.
     """
 
-    def __init__(self, kubeconfig_path: Optional[str] = None):
+    def __init__(
+        self,
+        kubeconfig_path: Optional[str] = None,
+        token: Optional[str] = None,
+        server_url: Optional[str] = None,
+        ca_cert: Optional[str] = None,
+        verify_ssl: bool = True,
+    ):
         """
         Initialize the discovery client.
         Args:
             kubeconfig_path: Path to kubeconfig file. If None, uses default config.
+            token: Bearer token for authentication (alternative to kubeconfig)
+            server_url: Kubernetes API server URL (required with token)
+            ca_cert: CA certificate for server verification (optional)
+            verify_ssl: Whether to verify SSL certificates (default: True)
         """
         if not KUBERNETES_AVAILABLE:
             raise ImportError(
@@ -85,20 +188,47 @@ class FeastServerDiscovery:
             )
 
         try:
-            if kubeconfig_path:
+            if token and server_url:
+                self._init_with_token(token, server_url, ca_cert, verify_ssl)
+            elif kubeconfig_path:
                 config.load_kube_config(config_file=kubeconfig_path)
+                self._init_clients()
             else:
                 try:
                     config.load_incluster_config()
                 except config.ConfigException:
                     config.load_kube_config()
-
-            self.k8s_client = client.ApiClient()
-            self.core_v1 = client.CoreV1Api()
-            self.custom_objects_api = client.CustomObjectsApi()
+                self._init_clients()
 
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Kubernetes client: {e}")
+
+    def _init_with_token(
+        self,
+        token: str,
+        server_url: str,
+        ca_cert: Optional[str] = None,
+        verify_ssl: bool = True,
+    ):
+        """Initialize client with token-based authentication."""
+        configuration = client.Configuration()
+        configuration.host = server_url
+        configuration.api_key_prefix["authorization"] = "Bearer"
+        configuration.api_key["authorization"] = token
+
+        if ca_cert:
+            configuration.ssl_ca_cert = ca_cert
+        configuration.verify_ssl = verify_ssl
+
+        self.k8s_client = client.ApiClient(configuration)
+        self.core_v1 = client.CoreV1Api(self.k8s_client)
+        self.custom_objects_api = client.CustomObjectsApi(self.k8s_client)
+
+    def _init_clients(self):
+        """Initialize standard Kubernetes clients."""
+        self.k8s_client = client.ApiClient()
+        self.core_v1 = client.CoreV1Api()
+        self.custom_objects_api = client.CustomObjectsApi()
 
     def _get_namespace_registry_location(self) -> tuple[str, str]:
         """
@@ -107,7 +237,6 @@ class FeastServerDiscovery:
             Tuple of (namespace, configmap_name)
         """
         try:
-            # Check for DSCInitialization
             self.custom_objects_api.get_namespaced_custom_object(
                 group="dscinitialization.opendatahub.io",
                 version="v1",
@@ -119,7 +248,6 @@ class FeastServerDiscovery:
         except ApiException:
             pass
 
-        # Default to Kubernetes mode
         return DEFAULT_KUBERNETES_NAMESPACE, NAMESPACE_REGISTRY_CONFIGMAP_NAME
 
     def get_servers(
@@ -310,7 +438,7 @@ class FeastServerDiscovery:
 
         return servers
 
-    def connect_to_server(self, server_info: FeastServerInfo) -> FeatureStore:
+    def connect_to_server(self, server_info: FeastServerInfo) -> "FeatureStore":
         """
         Create a FeatureStore client connected to the specified server.
         Args:
@@ -337,65 +465,103 @@ class FeastServerDiscovery:
                 f.write(config_cm.data["feature_store.yaml"])
 
             # Create and return the FeatureStore instance
+            from feast.feature_store import FeatureStore
+
             return FeatureStore(repo_path=temp_dir)
 
         except Exception as e:
             raise RuntimeError(f"Failed to connect to server {server_info.name}: {e}")
 
 
-# Convenience functions for the desired API
 def get_servers(
-    namespace_filter: Optional[str] = None, kubeconfig_path: Optional[str] = None
+    namespace_filter: Optional[str] = None,
+    kubeconfig_path: Optional[str] = None,
+    token: Optional[str] = None,
+    server_url: Optional[str] = None,
+    ca_cert: Optional[str] = None,
+    verify_ssl: bool = True,
 ) -> List[FeastServerInfo]:
     """
     Discover available Feast servers.
+
+    If authentication parameters are provided, they will be used for this call only.
+    If no authentication parameters are provided, the global authentication session
+    will be used (if available).
+
     Args:
         namespace_filter: Optional namespace to filter servers by
-        kubeconfig_path: Path to kubeconfig file
+        kubeconfig_path: Path to kubeconfig file (alternative to token auth)
+        token: Bearer token for authentication (alternative to kubeconfig)
+        server_url: Kubernetes API server URL (required with token)
+        ca_cert: CA certificate for server verification (optional)
+        verify_ssl: Whether to verify SSL certificates (default: True)
     Returns:
         List of available servers
     """
-    discovery = FeastServerDiscovery(kubeconfig_path)
+    if token and server_url:
+        discovery = FeastServerDiscovery(
+            kubeconfig_path=kubeconfig_path,
+            token=token,
+            server_url=server_url,
+            ca_cert=ca_cert,
+            verify_ssl=verify_ssl,
+        )
+        return discovery.get_servers(namespace_filter)
+
+    if kubeconfig_path:
+        discovery = FeastServerDiscovery(kubeconfig_path=kubeconfig_path)
+        return discovery.get_servers(namespace_filter)
+
+    global _current_auth
+    if _current_auth and _current_auth.is_authenticated():
+        return _current_auth.get_servers(namespace_filter)
+
+    discovery = FeastServerDiscovery()
     return discovery.get_servers(namespace_filter)
 
 
 def connect_to_server(
-    server_info: FeastServerInfo, kubeconfig_path: Optional[str] = None
-) -> FeatureStore:
+    server_info: FeastServerInfo,
+    kubeconfig_path: Optional[str] = None,
+    token: Optional[str] = None,
+    server_url: Optional[str] = None,
+    ca_cert: Optional[str] = None,
+    verify_ssl: bool = True,
+) -> "FeatureStore":
     """
     Connect to a specific Feast server.
+
+    If authentication parameters are provided, they will be used for this call only.
+    If no authentication parameters are provided, the global authentication session
+    will be used (if available).
+
     Args:
         server_info: Server to connect to
-        kubeconfig_path: Path to kubeconfig file
+        kubeconfig_path: Path to kubeconfig file (alternative to token auth)
+        token: Bearer token for authentication (alternative to kubeconfig)
+        server_url: Kubernetes API server URL (required with token)
+        ca_cert: CA certificate for server verification (optional)
+        verify_ssl: Whether to verify SSL certificates (default: True)
     Returns:
         Connected FeatureStore instance
     """
-    discovery = FeastServerDiscovery(kubeconfig_path)
-    return discovery.connect_to_server(server_info)
+    if token and server_url:
+        discovery = FeastServerDiscovery(
+            kubeconfig_path=kubeconfig_path,
+            token=token,
+            server_url=server_url,
+            ca_cert=ca_cert,
+            verify_ssl=verify_ssl,
+        )
+        return discovery.connect_to_server(server_info)
 
+    if kubeconfig_path:
+        discovery = FeastServerDiscovery(kubeconfig_path=kubeconfig_path)
+        return discovery.connect_to_server(server_info)
 
-# Extend FeatureStore class with discovery methods
-def _get_servers(
-    cls, namespace_filter: Optional[str] = None, kubeconfig_path: Optional[str] = None
-) -> List[FeastServerInfo]:
-    """Class method to discover available Feast servers."""
-    return get_servers(namespace_filter, kubeconfig_path)
+    global _current_auth
+    if _current_auth and _current_auth.is_authenticated():
+        return _current_auth.connect_to_server(server_info)
 
-
-def _connect_to_discovered_server(self, server_info: FeastServerInfo) -> "FeatureStore":
-    """Connect this FeatureStore instance to a discovered server."""
     discovery = FeastServerDiscovery()
-    connected_store = discovery.connect_to_server(server_info)
-
-    # Copy the configuration and registry to this instance
-    self.config = connected_store.config
-    self.repo_path = connected_store.repo_path
-    self._registry = connected_store._registry
-    self._provider = connected_store._provider
-
-    return self
-
-
-# Monkey patch the FeatureStore class to add discovery methods
-FeatureStore.get_servers = classmethod(_get_servers)
-FeatureStore.connect_to_server = _connect_to_discovered_server
+    return discovery.connect_to_server(server_info)
