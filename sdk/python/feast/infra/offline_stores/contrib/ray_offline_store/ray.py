@@ -45,6 +45,7 @@ from feast.infra.offline_stores.offline_utils import (
 )
 from feast.infra.ray_shared_utils import (
     _build_required_columns,
+    _is_ray_dataset,
     apply_field_mapping,
     ensure_timestamp_compatibility,
     normalize_timestamp_columns,
@@ -64,27 +65,6 @@ from feast.utils import _get_column_names, make_df_tzaware, make_tzaware
 logger = logging.getLogger(__name__)
 
 # Import RemoteDatasetProxy to handle isinstance checks
-try:
-    from feast.infra.codeflare_ray_wrapper import RemoteDatasetProxy
-
-    REMOTE_DATASET_PROXY_AVAILABLE = True
-except ImportError:
-    # Fallback for when codeflare_ray_wrapper is not available
-    RemoteDatasetProxy = None  # type: ignore
-    REMOTE_DATASET_PROXY_AVAILABLE = False
-
-
-def _is_ray_dataset(data: Any) -> bool:
-    """Check if data is a Ray Dataset or RemoteDatasetProxy."""
-    if isinstance(data, Dataset):
-        return True
-    if (
-        REMOTE_DATASET_PROXY_AVAILABLE
-        and RemoteDatasetProxy is not None
-        and isinstance(data, RemoteDatasetProxy)
-    ):
-        return True
-    return False
 
 
 def _get_data_schema_info(

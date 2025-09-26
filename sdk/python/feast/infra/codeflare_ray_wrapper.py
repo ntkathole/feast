@@ -24,137 +24,9 @@ import pyarrow as pa
 import ray
 
 from feast.infra.ray_config_manager import RayConfigManager
+from feast.infra.ray_shared_utils import RemoteDatasetProxy
 
 logger = logging.getLogger(__name__)
-
-
-class RemoteDatasetProxy:
-    """Proxy class that executes Ray Data operations remotely on cluster workers."""
-
-    def __init__(self, dataset_ref: Any):
-        """Initialize with a reference to the remote dataset."""
-        self._dataset_ref = dataset_ref
-
-    def map_batches(self, func, **kwargs) -> "RemoteDatasetProxy":
-        """Execute map_batches remotely on cluster workers."""
-
-        @ray.remote
-        def _remote_map_batches(dataset, function, batch_kwargs):
-            return dataset.map_batches(function, **batch_kwargs)
-
-        new_ref = _remote_map_batches.remote(self._dataset_ref, func, kwargs)
-        return RemoteDatasetProxy(new_ref)
-
-    def filter(self, fn) -> "RemoteDatasetProxy":
-        """Execute filter remotely on cluster workers."""
-
-        @ray.remote
-        def _remote_filter(dataset, filter_fn):
-            return dataset.filter(filter_fn)
-
-        new_ref = _remote_filter.remote(self._dataset_ref, fn)
-        return RemoteDatasetProxy(new_ref)
-
-    def to_pandas(self) -> pd.DataFrame:
-        """Execute to_pandas remotely and transfer result to client."""
-
-        @ray.remote
-        def _remote_to_pandas(dataset):
-            return dataset.to_pandas()
-
-        result_ref = _remote_to_pandas.remote(self._dataset_ref)
-        return ray.get(result_ref)
-
-    def to_arrow(self) -> pa.Table:
-        """Execute to_arrow remotely and transfer result to client."""
-
-        @ray.remote
-        def _remote_to_arrow(dataset):
-            try:
-                return dataset.to_arrow()
-            except AttributeError:
-                # Fallback for older Ray versions
-                import pyarrow as pa
-
-                pandas_df = dataset.to_pandas()
-                return pa.Table.from_pandas(pandas_df)
-
-        result_ref = _remote_to_arrow.remote(self._dataset_ref)
-        return ray.get(result_ref)
-
-    def schema(self) -> Any:
-        """Get dataset schema."""
-
-        @ray.remote
-        def _remote_schema(dataset):
-            return dataset.schema()
-
-        schema_ref = _remote_schema.remote(self._dataset_ref)
-        return ray.get(schema_ref)
-
-    def sort(self, key, descending=False) -> "RemoteDatasetProxy":
-        """Execute sort remotely on cluster workers."""
-
-        @ray.remote
-        def _remote_sort(dataset, sort_key, desc):
-            return dataset.sort(sort_key, descending=desc)
-
-        new_ref = _remote_sort.remote(self._dataset_ref, key, descending)
-        return RemoteDatasetProxy(new_ref)
-
-    def limit(self, count) -> "RemoteDatasetProxy":
-        """Execute limit remotely on cluster workers."""
-
-        @ray.remote
-        def _remote_limit(dataset, limit_count):
-            return dataset.limit(limit_count)
-
-        new_ref = _remote_limit.remote(self._dataset_ref, count)
-        return RemoteDatasetProxy(new_ref)
-
-    def union(self, other) -> "RemoteDatasetProxy":
-        """Execute union remotely on cluster workers."""
-
-        @ray.remote
-        def _remote_union(dataset1, dataset2):
-            return dataset1.union(dataset2)
-
-        new_ref = _remote_union.remote(self._dataset_ref, other._dataset_ref)
-        return RemoteDatasetProxy(new_ref)
-
-    def materialize(self) -> "RemoteDatasetProxy":
-        """Execute materialize remotely on cluster workers."""
-
-        @ray.remote
-        def _remote_materialize(dataset):
-            return dataset.materialize()
-
-        new_ref = _remote_materialize.remote(self._dataset_ref)
-        return RemoteDatasetProxy(new_ref)
-
-    def count(self) -> int:
-        """Execute count remotely and return result."""
-
-        @ray.remote
-        def _remote_count(dataset):
-            return dataset.count()
-
-        result_ref = _remote_count.remote(self._dataset_ref)
-        return ray.get(result_ref)
-
-    def take(self, n=20) -> list:
-        """Execute take remotely and return result."""
-
-        @ray.remote
-        def _remote_take(dataset, num):
-            return dataset.take(num)
-
-        result_ref = _remote_take.remote(self._dataset_ref, n)
-        return ray.get(result_ref)
-
-    def __getattr__(self, name):
-        """Catch any method calls that we haven't explicitly implemented."""
-        raise AttributeError(f"RemoteDatasetProxy has no attribute '{name}'")
 
 
 class CodeFlareRayWrapper:
@@ -288,20 +160,6 @@ class CodeFlareRayWrapper:
             return ray.data.from_arrow(arrow_table)
 
         return RemoteDatasetProxy(_remote_from_arrow.remote(table))
-
-    def to_pandas(self, dataset: Any) -> pd.DataFrame:
-        """Convert dataset to pandas DataFrame."""
-        if isinstance(dataset, RemoteDatasetProxy):
-            return dataset.to_pandas()
-        else:
-            return dataset.to_pandas()
-
-    def to_arrow(self, dataset: Any) -> pa.Table:
-        """Convert dataset to Arrow table."""
-        if isinstance(dataset, RemoteDatasetProxy):
-            return dataset.to_arrow()
-        else:
-            return dataset.to_arrow()
 
 
 # Global wrapper instance
