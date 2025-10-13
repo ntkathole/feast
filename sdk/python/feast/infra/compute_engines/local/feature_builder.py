@@ -55,9 +55,22 @@ class LocalFeatureBuilder(FeatureBuilder):
     def build_aggregation_node(self, view, input_node):
         agg_specs = view.aggregations
         agg_ops = self._get_aggregate_operations(agg_specs)
-        group_by_keys = view.entities
+
+        # Extract join keys from entities (not entity names)
+        column_info = self.get_column_info(view)
+        group_by_keys = column_info.join_keys
+
+        # Check if we have time window aggregations
+        has_time_window = any(agg.time_window is not None for agg in agg_specs)
+        timestamp_col = view.timestamp_field if has_time_window else None
+
         node = LocalAggregationNode(
-            "agg", self.backend, group_by_keys, agg_ops, inputs=[input_node]
+            "agg",
+            self.backend,
+            group_by_keys,
+            agg_ops,
+            timestamp_col=timestamp_col,
+            inputs=[input_node],
         )
         self.nodes.append(node)
         return node
@@ -98,10 +111,12 @@ class LocalFeatureBuilder(FeatureBuilder):
     def _get_aggregate_operations(agg_specs):
         agg_ops = {}
         for agg in agg_specs:
+            # Include time_window information in the alias if present
             if agg.time_window is not None:
-                raise ValueError(
-                    "Time window aggregation is not supported in the local compute engine."
-                )
-            alias = f"{agg.function}_{agg.column}"
-            agg_ops[alias] = (agg.function, agg.column)
+                window_seconds = int(agg.time_window.total_seconds())
+                alias = f"{agg.function}_{agg.column}_{window_seconds}s"
+                agg_ops[alias] = (agg.function, agg.column, agg.time_window)
+            else:
+                alias = f"{agg.function}_{agg.column}"
+                agg_ops[alias] = (agg.function, agg.column, None)
         return agg_ops

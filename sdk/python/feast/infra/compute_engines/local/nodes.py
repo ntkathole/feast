@@ -159,17 +159,33 @@ class LocalAggregationNode(LocalNode):
         backend: DataFrameBackend,
         group_keys: list[str],
         agg_ops: dict,
+        timestamp_col: Optional[str] = None,
         inputs=None,
     ):
         super().__init__(name, inputs=inputs)
         self.backend = backend
         self.group_keys = group_keys
         self.agg_ops = agg_ops
+        self.timestamp_col = timestamp_col
 
     def execute(self, context: ExecutionContext) -> ArrowTableValue:
         input_table = self.get_single_table(context).data
         df = self.backend.from_arrow(input_table)
-        grouped_df = self.backend.groupby_agg(df, self.group_keys, self.agg_ops)
+
+        # Check if we need time window aggregation
+        has_time_window = any(
+            len(op) > 2 and op[2] is not None for op in self.agg_ops.values()
+        )
+
+        if has_time_window and self.timestamp_col:
+            # Time-windowed aggregation
+            grouped_df = self.backend.groupby_agg_with_time_window(
+                df, self.group_keys, self.agg_ops, self.timestamp_col
+            )
+        else:
+            # Simple aggregation (no time window)
+            grouped_df = self.backend.groupby_agg(df, self.group_keys, self.agg_ops)
+
         result = self.backend.to_arrow(grouped_df)
         output = ArrowTableValue(result)
         return output

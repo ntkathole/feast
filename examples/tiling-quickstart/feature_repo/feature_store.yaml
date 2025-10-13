@@ -1,0 +1,14 @@
+project: tiling_quickstart
+registry: data/registry.db
+
+# Provider determines the compute engine for materialization
+# provider: local → Uses LocalComputeEngine (with time window aggregation support!)
+provider: local
+
+# Configure Redis as online store
+online_store:
+    type: redis
+    connection_string: localhost:6379
+
+entity_key_serialization_version: 3
+

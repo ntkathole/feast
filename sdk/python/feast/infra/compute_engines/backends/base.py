@@ -35,6 +35,10 @@ class DataFrameBackend(ABC):
         Group and aggregate the dataframe. `agg_ops` maps output column names
         to (aggregation function, source column name) pairs.
 
+    groupby_agg_with_time_window(df: Any, group_keys: List[str], agg_ops: Dict[str, Tuple[str, str, timedelta]], timestamp_col: str) -> Any
+        Group and aggregate the dataframe with time windowing. `agg_ops` maps output column names
+        to (aggregation function, source column name, time_window) tuples.
+
     filter(df: Any, expr: str) -> Any
         Apply a filter expression (string-based) to the DataFrame.
 
@@ -61,6 +65,9 @@ class DataFrameBackend(ABC):
 
     @abstractmethod
     def groupby_agg(self, df, group_keys, agg_ops): ...
+
+    @abstractmethod
+    def groupby_agg_with_time_window(self, df, group_keys, agg_ops, timestamp_col): ...
 
     @abstractmethod
     def filter(self, df, expr): ...

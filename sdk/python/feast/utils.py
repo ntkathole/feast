@@ -153,7 +153,15 @@ def _get_column_names(
     """
     # if we have mapped fields, use the original field names in the call to the offline store
     timestamp_field = feature_view.batch_source.timestamp_field
-    feature_names = [feature.name for feature in feature_view.features]
+
+    # For StreamFeatureViews with aggregations, we need INPUT columns (agg.column),
+    # not OUTPUT feature names (agg.function_column_window)
+    if hasattr(feature_view, "aggregations") and feature_view.aggregations:
+        # Extract unique input columns from aggregations
+        feature_names = list(set(agg.column for agg in feature_view.aggregations))
+    else:
+        feature_names = [feature.name for feature in feature_view.features]
+
     created_timestamp_column = feature_view.batch_source.created_timestamp_column
 
     from feast.feature_view import DUMMY_ENTITY_ID
@@ -277,10 +285,20 @@ def _convert_arrow_fv_to_proto(
     if isinstance(table, pyarrow.Table):
         table = table.to_batches()[0]
 
-    # TODO: This will break if the feature view has aggregations or transformations
-    columns = [
-        (field.name, field.dtype.to_value_type()) for field in feature_view.features
-    ] + list(join_keys.items())
+    # For StreamFeatureViews with aggregations, use schema (aggregated features)
+    # For others, use features (base features)
+    if (
+        hasattr(feature_view, "aggregations")
+        and feature_view.aggregations
+        and feature_view.schema
+    ):
+        columns = [
+            (field.name, field.dtype.to_value_type()) for field in feature_view.schema
+        ] + list(join_keys.items())
+    else:
+        columns = [
+            (field.name, field.dtype.to_value_type()) for field in feature_view.features
+        ] + list(join_keys.items())
 
     proto_values_by_column = {
         column: python_values_to_proto_values(
@@ -298,10 +316,21 @@ def _convert_arrow_fv_to_proto(
     ]
 
     # Serialize the features per row
-    feature_dict = {
-        feature.name: proto_values_by_column[feature.name]
-        for feature in feature_view.features
-    }
+    # For aggregation-based views, use schema; otherwise use features
+    if (
+        hasattr(feature_view, "aggregations")
+        and feature_view.aggregations
+        and feature_view.schema
+    ):
+        feature_dict = {
+            field.name: proto_values_by_column[field.name]
+            for field in feature_view.schema
+        }
+    else:
+        feature_dict = {
+            feature.name: proto_values_by_column[feature.name]
+            for feature in feature_view.features
+        }
     features = [dict(zip(feature_dict, vars)) for vars in zip(*feature_dict.values())]
 
     # Convert event_timestamps
