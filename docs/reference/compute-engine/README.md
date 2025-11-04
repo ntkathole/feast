@@ -55,6 +55,7 @@ An example of built output from FeatureBuilder:
 
 - Distributed DAG execution via Apache Spark
 - Supports point-in-time joins and large-scale materialization
+- **⚡ Tiling with Intermediate Representations** for efficient `StreamFeatureView` aggregations ([concept](../../getting-started/concepts/tiling.md) | [Spark details](spark-tiling.md))
 - Integrates with `SparkOfflineStore` and `SparkMaterializationJob`
 
 ### ⚡ RayComputeEngine (contrib)

@@ -6,6 +6,7 @@ from types import FunctionType
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import dill
+from google.protobuf.duration_pb2 import Duration
 from google.protobuf.message import Message
 from typeguard import typechecked
 
@@ -114,6 +115,8 @@ class StreamFeatureView(FeatureView):
         udf_string: Optional[str] = "",
         feature_transformation: Optional[Transformation] = None,
         stream_engine: Optional[Dict[str, Any]] = None,
+        enable_tiling: bool = False,
+        tiling_hop_size: Optional[timedelta] = None,
     ):
         if not flags_helper.is_test():
             warnings.warn(
@@ -145,6 +148,8 @@ class StreamFeatureView(FeatureView):
             feature_transformation or self.get_feature_transformation()
         )
         self.stream_engine = stream_engine
+        self.enable_tiling = enable_tiling
+        self.tiling_hop_size = tiling_hop_size
 
         super().__init__(
             name=name,
@@ -240,6 +245,12 @@ class StreamFeatureView(FeatureView):
             self.mode.value if isinstance(self.mode, TransformationMode) else self.mode
         )
 
+        # Serialize tiling configuration
+        tiling_hop_size_duration = None
+        if self.tiling_hop_size is not None:
+            tiling_hop_size_duration = Duration()
+            tiling_hop_size_duration.FromTimedelta(self.tiling_hop_size)
+
         spec = StreamFeatureViewSpecProto(
             name=self.name,
             entities=self.entities,
@@ -257,6 +268,8 @@ class StreamFeatureView(FeatureView):
             timestamp_field=self.timestamp_field,
             aggregations=[agg.to_proto() for agg in self.aggregations],
             mode=mode,
+            enable_tiling=self.enable_tiling,
+            tiling_hop_size=tiling_hop_size_duration,
         )
 
         return StreamFeatureViewProto(spec=spec, meta=meta)
@@ -311,6 +324,12 @@ class StreamFeatureView(FeatureView):
                 for agg_proto in sfv_proto.spec.aggregations
             ],
             timestamp_field=sfv_proto.spec.timestamp_field,
+            enable_tiling=sfv_proto.spec.enable_tiling,
+            tiling_hop_size=(
+                sfv_proto.spec.tiling_hop_size.ToTimedelta()
+                if sfv_proto.spec.tiling_hop_size.ToNanoseconds() != 0
+                else None
+            ),
         )
 
         if batch_source:

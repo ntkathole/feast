@@ -151,9 +151,19 @@ def _get_column_names(
         and reverse-mapped created timestamp column that will be passed into
         the query to the offline store.
     """
+    from feast.stream_feature_view import StreamFeatureView
+
     # if we have mapped fields, use the original field names in the call to the offline store
     timestamp_field = feature_view.batch_source.timestamp_field
-    feature_names = [feature.name for feature in feature_view.features]
+
+    # For StreamFeatureView with aggregations, read INPUT columns from aggregations
+    if isinstance(feature_view, StreamFeatureView) and feature_view.aggregations:
+        # Extract unique input columns from aggregations
+        feature_names = list(set(agg.column for agg in feature_view.aggregations))
+    else:
+        # For regular feature views, use the feature names
+        feature_names = [feature.name for feature in feature_view.features]
+
     created_timestamp_column = feature_view.batch_source.created_timestamp_column
 
     from feast.feature_view import DUMMY_ENTITY_ID

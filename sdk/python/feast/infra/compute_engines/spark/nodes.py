@@ -12,6 +12,9 @@ from feast.infra.compute_engines.dag.context import ColumnInfo, ExecutionContext
 from feast.infra.compute_engines.dag.model import DAGFormat
 from feast.infra.compute_engines.dag.node import DAGNode
 from feast.infra.compute_engines.dag.value import DAGValue
+from feast.infra.compute_engines.spark.tiling import (
+    apply_sawtooth_window_tiling,
+)
 from feast.infra.compute_engines.spark.utils import map_in_arrow
 from feast.infra.compute_engines.utils import (
     create_offline_store_retrieval_job,
@@ -102,17 +105,104 @@ class SparkAggregationNode(DAGNode):
         group_by_keys: List[str],
         timestamp_col: str,
         inputs=None,
+        enable_tiling: bool = False,
+        hop_size: Optional[timedelta] = None,
     ):
         super().__init__(name, inputs=inputs)
         self.aggregations = aggregations
         self.group_by_keys = group_by_keys
         self.timestamp_col = timestamp_col
+        self.enable_tiling = enable_tiling
+        self.hop_size = hop_size
 
     def execute(self, context: ExecutionContext) -> DAGValue:
         input_value = self.get_single_input_value(context)
         input_value.assert_format(DAGFormat.SPARK)
         input_df: DataFrame = input_value.data
 
+        # Check if tiling is enabled and we have time-windowed aggregations
+        has_time_windows = any(agg.time_window for agg in self.aggregations)
+
+        if self.enable_tiling and has_time_windows:
+            # Use transformation-based tiling (Chronon-inspired)
+            return self._execute_tiled_aggregation(input_df)
+        else:
+            # Use standard aggregation (existing logic)
+            return self._execute_standard_aggregation(input_df)
+
+    def _execute_tiled_aggregation(self, input_df: DataFrame) -> DAGValue:
+        """
+        Execute aggregation using transformation-based tiling.
+
+        Processes each unique time window separately to avoid column name conflicts.
+        """
+        # Extract entity join keys (convert Entity objects to strings)
+        entity_keys = []
+        for key in self.group_by_keys:
+            if hasattr(key, "join_key"):
+                entity_keys.append(key.join_key)
+            elif isinstance(key, str):
+                entity_keys.append(key)
+            else:
+                # Fallback: try to get name
+                entity_keys.append(str(key))
+
+        # Group aggregations by time window to process separately
+        from collections import defaultdict
+
+        aggs_by_window = defaultdict(list)
+        for agg in self.aggregations:
+            if agg.time_window is None:
+                raise ValueError(
+                    f"Aggregation on {agg.column} requires time_window for tiling."
+                )
+            aggs_by_window[agg.time_window].append(agg)
+
+        # Process each time window separately and collect results
+        result_dfs = []
+        for time_window, window_aggs in aggs_by_window.items():
+            tiled_df = apply_sawtooth_window_tiling(
+                df=input_df,
+                aggregations=window_aggs,
+                group_by_keys=entity_keys,
+                timestamp_col=self.timestamp_col,
+                window_size=time_window,
+                hop_size=self.hop_size,
+            )
+
+            # Drop internal tile metadata columns before collecting
+            # These are only needed during tiling, not in the final output
+            cols_to_drop = ["_tile_start", "_tile_end"]
+            for col in cols_to_drop:
+                if col in tiled_df.columns:
+                    tiled_df = tiled_df.drop(col)
+
+            result_dfs.append(tiled_df)
+
+        # Merge all windowed results by joining on entity keys
+        if len(result_dfs) == 1:
+            final_df = result_dfs[0]
+        else:
+            # Join on entity keys - each window contributes different aggregated features
+            final_df = result_dfs[0]
+            for df in result_dfs[1:]:
+                # Outer join to preserve all entity combinations
+                final_df = final_df.join(df, on=entity_keys, how="outer")
+
+        return DAGValue(
+            data=final_df,
+            format=DAGFormat.SPARK,
+            metadata={
+                "aggregated": True,
+                "tiled": True,
+                "window_sizes": [
+                    int(tw.total_seconds()) for tw in aggs_by_window.keys()
+                ],
+            },
+        )
+
+    def _execute_standard_aggregation(self, input_df: DataFrame) -> DAGValue:
+        """Execute standard Spark aggregation (existing logic)."""
         agg_exprs = []
         for agg in self.aggregations:
             func = getattr(F, agg.function)
@@ -132,15 +222,32 @@ class SparkAggregationNode(DAGNode):
                 raise ValueError("Aggregation requires time_window but got None.")
             window_duration_str = f"{int(time_window.total_seconds())} seconds"
 
+            # Extract entity join keys
+            entity_keys = []
+            for key in self.group_by_keys:
+                if hasattr(key, "join_key"):
+                    entity_keys.append(key.join_key)
+                elif isinstance(key, str):
+                    entity_keys.append(key)
+                else:
+                    entity_keys.append(str(key))
+
             grouped = input_df.groupBy(
-                *self.group_by_keys,
+                *entity_keys,
                 F.window(F.col(self.timestamp_col), window_duration_str),
             ).agg(*agg_exprs)
         else:
             # Simple aggregation
-            grouped = input_df.groupBy(
-                *self.group_by_keys,
-            ).agg(*agg_exprs)
+            entity_keys = []
+            for key in self.group_by_keys:
+                if hasattr(key, "join_key"):
+                    entity_keys.append(key.join_key)
+                elif isinstance(key, str):
+                    entity_keys.append(key)
+                else:
+                    entity_keys.append(str(key))
+
+            grouped = input_df.groupBy(*entity_keys).agg(*agg_exprs)
 
         return DAGValue(
             data=grouped, format=DAGFormat.SPARK, metadata={"aggregated": True}

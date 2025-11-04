@@ -13,6 +13,7 @@ The engine supports the following features:
 - Support for reading different data sources, such as Spark SQL, BigQuery, and Snowflake.
 - Distributed execution of feature transformations and aggregations.
 - Support for custom transformations using Spark SQL or UDFs.
+- **⚡ Tiling with Intermediate Representations**: Efficient pre-aggregation for `StreamFeatureView` with correct merging semantics. [Learn more about tiling](../../getting-started/concepts/tiling.md) | [Spark implementation details](spark-tiling.md).
 
 
 ## Example
