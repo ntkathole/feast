@@ -22,12 +22,54 @@ complete, self-contained Ray setup system.
 import logging
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import ray
 from ray.data.context import DatasetContext
 
 logger = logging.getLogger(__name__)
+
+# Well-known paths for Kubernetes in-cluster service account credentials
+_K8S_SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+_K8S_SA_NAMESPACE_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+_K8S_SA_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+
+def _is_running_in_k8s() -> bool:
+    """Check if the current process is running inside a Kubernetes pod."""
+    return os.path.exists(_K8S_SA_TOKEN_PATH)
+
+
+def _read_k8s_sa_token() -> Optional[str]:
+    """Read the Kubernetes service account token from the projected volume."""
+    try:
+        return Path(_K8S_SA_TOKEN_PATH).read_text().strip()
+    except (OSError, IOError):
+        return None
+
+
+def _read_k8s_namespace() -> Optional[str]:
+    """Read the Kubernetes namespace from the projected volume."""
+    try:
+        return Path(_K8S_SA_NAMESPACE_PATH).read_text().strip()
+    except (OSError, IOError):
+        return None
+
+
+def _detect_k8s_api_server() -> Optional[str]:
+    """
+    Detect the Kubernetes API server URL from in-cluster environment variables.
+    These are automatically set by Kubernetes in every pod.
+    """
+    k8s_host = os.getenv("KUBERNETES_SERVICE_HOST")
+    k8s_port = os.getenv("KUBERNETES_SERVICE_PORT_HTTPS", "443")
+    if k8s_host:
+        # IPv6 addresses need brackets
+        if ":" in k8s_host and not k8s_host.startswith("["):
+            k8s_host = f"[{k8s_host}]"
+        return f"https://{k8s_host}:{k8s_port}"
+    return None
 
 
 class RayExecutionMode(Enum):
@@ -133,6 +175,15 @@ class RayConfigManager:
         """
         Get KubeRay/CodeFlare SDK configuration.
 
+        Configuration is resolved with the following precedence (highest first):
+        1. Environment variables (FEAST_RAY_AUTH_TOKEN, FEAST_RAY_AUTH_SERVER, etc.)
+        2. kuberay_conf in feature_store.yaml
+        3. Automatic in-cluster detection (SA token, K8s API server, namespace)
+
+        When running inside a Kubernetes pod, auth_token and auth_server are
+        automatically detected from the pod's service account credentials,
+        so users don't need to specify them explicitly.
+
         Returns:
             Dictionary of KubeRay configuration with passthrough settings
         """
@@ -142,43 +193,84 @@ class RayConfigManager:
         # Get passthrough configuration from kuberay_conf first
         kuberay_conf = self._get_config_value("kuberay_conf", {}) or {}
 
+        # Resolve namespace: env var > yaml > in-cluster detection > raise error
+        namespace = os.getenv("FEAST_RAY_NAMESPACE") or kuberay_conf.get("namespace")
+        if not namespace:
+            # Auto-detect from in-cluster service account
+            namespace = _read_k8s_namespace()
+            if namespace:
+                logger.info(
+                    f"Auto-detected Kubernetes namespace from service account: {namespace}"
+                )
+            else:
+                raise ValueError(
+                    "namespace is required for KubeRay mode but could not be "
+                    "determined. Set it in kuberay_conf.namespace in "
+                    "feature_store.yaml, via FEAST_RAY_NAMESPACE environment "
+                    "variable, or run from inside a Kubernetes pod (namespace "
+                    "is detected automatically from the service account)."
+                )
+
         config = {
             "use_kuberay": (
                 os.getenv("FEAST_USE_KUBERAY", "").lower() == "true"
                 or self._get_config_value("use_kuberay", False)
             ),
-            # Get values from kuberay_conf or environment variables
             "cluster_name": (
                 os.getenv("FEAST_RAY_CLUSTER_NAME") or kuberay_conf.get("cluster_name")
             ),
-            "namespace": (
-                os.getenv("FEAST_RAY_NAMESPACE")
-                or kuberay_conf.get("namespace", "default")
-            ),
+            "namespace": namespace,
         }
 
-        # Add authentication configuration from kuberay_conf or environment variables
+        # Resolve auth_token: env var > yaml > in-cluster SA token
         auth_token = (
             os.getenv("FEAST_RAY_AUTH_TOKEN")
             or os.getenv("RAY_AUTH_TOKEN")
             or kuberay_conf.get("auth_token")
         )
+        if not auth_token and _is_running_in_k8s():
+            auth_token = _read_k8s_sa_token()
+            if auth_token:
+                logger.info("Auto-detected auth token from Kubernetes service account")
         if auth_token:
             config["auth_token"] = auth_token
 
-        # Add authentication server URL
+        # Resolve auth_server: env var > yaml > in-cluster K8s API server
         auth_server = (
             os.getenv("FEAST_RAY_AUTH_SERVER")
             or os.getenv("RAY_AUTH_SERVER")
             or kuberay_conf.get("auth_server")
         )
+        if not auth_server and _is_running_in_k8s():
+            auth_server = _detect_k8s_api_server()
+            if auth_server:
+                logger.info(f"Auto-detected Kubernetes API server: {auth_server}")
         if auth_server:
             config["auth_server"] = auth_server
 
-        # Add skip TLS verification setting
-        skip_tls = os.getenv(
-            "FEAST_RAY_SKIP_TLS", ""
-        ).lower() == "true" or kuberay_conf.get("skip_tls", False)
+        # Resolve skip_tls: env var > yaml > auto (True for in-cluster with auto-detected server)
+        skip_tls_env = os.getenv("FEAST_RAY_SKIP_TLS", "").lower()
+        if skip_tls_env:
+            skip_tls = skip_tls_env == "true"
+        elif "skip_tls" in kuberay_conf:
+            skip_tls = kuberay_conf["skip_tls"]
+        elif (
+            not (
+                os.getenv("FEAST_RAY_AUTH_SERVER")
+                or os.getenv("RAY_AUTH_SERVER")
+                or kuberay_conf.get("auth_server")
+            )
+            and _is_running_in_k8s()
+        ):
+            # Auto-detected in-cluster API server: default to skip_tls=True
+            # because the in-cluster API uses an internal CA that CodeFlare SDK
+            # may not trust by default
+            skip_tls = True
+            logger.info(
+                "Auto-detected in-cluster environment, defaulting skip_tls=True"
+            )
+        else:
+            skip_tls = False
         config["skip_tls"] = skip_tls
 
         # Add any additional configuration from kuberay_conf
@@ -235,19 +327,58 @@ class CodeFlareRayWrapper:
         self,
         cluster_name: str,
         namespace: str,
-        auth_token: str,
-        auth_server: str,
+        auth_token: Optional[str] = None,
+        auth_server: Optional[str] = None,
         skip_tls: bool = False,
         enable_logging: bool = False,
     ):
-        """Initialize CodeFlare Ray wrapper with cluster connection parameters."""
+        """
+        Initialize CodeFlare Ray wrapper with cluster connection parameters.
+
+        When running inside a Kubernetes pod, auth_token and auth_server are
+        automatically resolved from the pod's service account if not provided.
+
+        Args:
+            cluster_name: Name of the KubeRay RayCluster resource
+            namespace: Kubernetes namespace where the RayCluster is deployed
+            auth_token: Authentication token (auto-detected from SA if not provided)
+            auth_server: Kubernetes API server URL (auto-detected if not provided)
+            skip_tls: Whether to skip TLS verification for K8s API
+            enable_logging: Whether to enable verbose Ray logging
+        """
         self.cluster_name = cluster_name
         self.namespace = namespace
-        self.auth_token = auth_token
-        self.auth_server = auth_server
         self.skip_tls = skip_tls
         self.enable_logging = enable_logging
         self.cluster = None
+
+        # Auto-detect auth_token from in-cluster service account if not provided
+        self.auth_token = auth_token
+        if not self.auth_token and _is_running_in_k8s():
+            self.auth_token = _read_k8s_sa_token()
+            logger.info("Using auto-detected Kubernetes service account token")
+        if not self.auth_token:
+            raise ValueError(
+                "auth_token is required for KubeRay mode. Either provide it in "
+                "kuberay_conf, set FEAST_RAY_AUTH_TOKEN environment variable, or "
+                "run from inside a Kubernetes pod (service account token is used "
+                "automatically)."
+            )
+
+        # Auto-detect auth_server from in-cluster environment if not provided
+        self.auth_server = auth_server
+        if not self.auth_server and _is_running_in_k8s():
+            self.auth_server = _detect_k8s_api_server()
+            logger.info(
+                f"Using auto-detected Kubernetes API server: {self.auth_server}"
+            )
+        if not self.auth_server:
+            raise ValueError(
+                "auth_server is required for KubeRay mode. Either provide it in "
+                "kuberay_conf, set FEAST_RAY_AUTH_SERVER environment variable, or "
+                "run from inside a Kubernetes pod (API server is detected "
+                "automatically)."
+            )
 
         # Authenticate and setup Ray connection
         self._authenticate_codeflare()
@@ -543,12 +674,21 @@ def _initialize_kuberay(config: Any, enable_logging: bool = False) -> None:
     config_manager = RayConfigManager(config)
     kuberay_config = config_manager.get_kuberay_config()
 
-    # Initialize CodeFlare Ray wrapper - this connects to the cluster
+    # Validate that cluster_name is provided
+    if not kuberay_config.get("cluster_name"):
+        raise ValueError(
+            "cluster_name is required for KubeRay mode. Set it in "
+            "kuberay_conf.cluster_name in feature_store.yaml or via "
+            "FEAST_RAY_CLUSTER_NAME environment variable."
+        )
+
+    # Initialize CodeFlare Ray wrapper - auth_token and auth_server will be
+    # auto-detected from in-cluster SA if not explicitly provided
     _ray_wrapper = CodeFlareRayWrapper(
         cluster_name=kuberay_config["cluster_name"],
         namespace=kuberay_config["namespace"],
-        auth_token=kuberay_config["auth_token"],
-        auth_server=kuberay_config["auth_server"],
+        auth_token=kuberay_config.get("auth_token"),
+        auth_server=kuberay_config.get("auth_server"),
         skip_tls=kuberay_config.get("skip_tls", False),
         enable_logging=enable_logging,
     )
