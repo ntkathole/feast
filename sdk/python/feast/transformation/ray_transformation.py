@@ -1,13 +1,11 @@
 import inspect
 from typing import Any, Callable, Optional, cast, get_type_hints
 
-import dill
-
 from feast.field import Field, from_value_type
 from feast.protos.feast.core.Transformation_pb2 import (
     UserDefinedFunctionV2 as UserDefinedFunctionProto,
 )
-from feast.transformation.base import Transformation
+from feast.transformation.base import Transformation, safe_load_udf
 from feast.transformation.mode import TransformationMode
 
 
@@ -285,7 +283,11 @@ class RayTransformation(Transformation):
     @classmethod
     def from_proto(cls, user_defined_function_proto: UserDefinedFunctionProto):
         return RayTransformation(
-            udf=dill.loads(user_defined_function_proto.body),
+            udf=safe_load_udf(
+                user_defined_function_proto.body,
+                user_defined_function_proto.body_text,
+                user_defined_function_proto.name,
+            ),
             udf_string=user_defined_function_proto.body_text,
             name=user_defined_function_proto.name
             if user_defined_function_proto.name

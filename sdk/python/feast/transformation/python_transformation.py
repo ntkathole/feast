@@ -1,14 +1,13 @@
 from types import FunctionType
 from typing import Any, Dict, Optional, cast
 
-import dill
 import pyarrow
 
 from feast.field import Field, from_value_type
 from feast.protos.feast.core.Transformation_pb2 import (
     UserDefinedFunctionV2 as UserDefinedFunctionProto,
 )
-from feast.transformation.base import Transformation
+from feast.transformation.base import Transformation, safe_load_udf
 from feast.transformation.mode import TransformationMode
 from feast.type_map import (
     python_type_to_feast_value_type,
@@ -165,6 +164,13 @@ class PythonTransformation(Transformation):
     @classmethod
     def from_proto(cls, user_defined_function_proto: UserDefinedFunctionProto):
         return PythonTransformation(
-            udf=dill.loads(user_defined_function_proto.body),
+            udf=cast(
+                FunctionType,
+                safe_load_udf(
+                    user_defined_function_proto.body,
+                    user_defined_function_proto.body_text,
+                    user_defined_function_proto.name,
+                ),
+            ),
             udf_string=user_defined_function_proto.body_text,
         )
