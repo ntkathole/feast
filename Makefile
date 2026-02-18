@@ -63,6 +63,18 @@ lint-python: ## Lint Python code
 	uv run ruff format --check sdk/python/feast/ sdk/python/tests/
 	uv run bash -c "cd sdk/python && mypy feast"
 
+.PHONY: lint-markdown
+lint-markdown: ## Lint Markdown files
+	@if command -v markdownlint >/dev/null 2>&1; then \
+		markdownlint '**/*.md' --ignore node_modules --ignore ui/node_modules --ignore .github; \
+	else \
+		echo "markdownlint not found, skipping (install: npm install -g markdownlint-cli)"; \
+	fi
+
+.PHONY: lint-all
+lint-all: lint-python lint-go lint-java lint-markdown ## Lint all languages (Python, Go, Java, Markdown)
+	@echo "✅ All lint checks completed"
+
 # New combined target
 precommit-check: format-python lint-python ## Run all precommit checks
 	@echo "✅ All precommit checks passed"

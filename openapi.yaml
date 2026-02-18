@@ -1,0 +1,318 @@
+openapi: 3.1.0
+info:
+  title: Feast Feature Server API
+  description: |
+    REST API for the Feast Feature Server. Provides endpoints for online feature
+    retrieval, feature pushing, materialization, and health checks.
+
+    For the full Feast documentation, see https://docs.feast.dev/
+  version: 0.1.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  contact:
+    name: Feast Community
+    url: https://github.com/feast-dev/feast
+
+servers:
+  - url: http://localhost:6566
+    description: Local development feature server
+
+paths:
+  /get-online-features:
+    post:
+      summary: Get online features
+      description: Retrieve feature values from the online store for given entities.
+      operationId: getOnlineFeatures
+      tags:
+        - Features
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetOnlineFeaturesRequest"
+            example:
+              features:
+                - "driver_hourly_stats:conv_rate"
+                - "driver_hourly_stats:acc_rate"
+              entities:
+                driver_id:
+                  - 1001
+                  - 1002
+              full_feature_names: false
+      responses:
+        "200":
+          description: Feature values retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetOnlineFeaturesResponse"
+        "422":
+          description: Validation error
+
+  /retrieve-online-documents:
+    post:
+      summary: Retrieve online documents (alpha)
+      description: |
+        Retrieve documents from the online store using vector similarity search.
+        This endpoint is in alpha and may change.
+      operationId: retrieveOnlineDocuments
+      tags:
+        - Documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetOnlineDocumentsRequest"
+      responses:
+        "200":
+          description: Documents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        "422":
+          description: Validation error
+
+  /push:
+    post:
+      summary: Push features
+      description: Push feature data to the online and/or offline store via a push source.
+      operationId: pushFeatures
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushFeaturesRequest"
+      responses:
+        "200":
+          description: Features pushed successfully (synchronous)
+        "202":
+          description: Features accepted for async offline write (batched)
+        "422":
+          description: Validation error
+
+  /write-to-online-store:
+    post:
+      summary: Write to online store
+      description: Directly write a dataframe of feature values to the online store.
+      operationId: writeToOnlineStore
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteToFeatureStoreRequest"
+      responses:
+        "200":
+          description: Data written successfully
+        "422":
+          description: Validation error
+
+  /materialize:
+    post:
+      summary: Materialize features
+      description: Materialize feature values from the offline store to the online store for a given time range.
+      operationId: materialize
+      tags:
+        - Materialization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterializeRequest"
+      responses:
+        "200":
+          description: Materialization completed
+
+  /materialize-incremental:
+    post:
+      summary: Materialize features incrementally
+      description: Incrementally materialize feature values up to a given end date.
+      operationId: materializeIncremental
+      tags:
+        - Materialization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterializeIncrementalRequest"
+      responses:
+        "200":
+          description: Incremental materialization completed
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns 200 if the feature server is healthy and the registry is loaded.
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Server is healthy
+        "503":
+          description: Server is not ready (registry not yet loaded)
+
+components:
+  schemas:
+    GetOnlineFeaturesRequest:
+      type: object
+      properties:
+        features:
+          type: array
+          items:
+            type: string
+          description: List of feature references in "feature_view:feature" format.
+        feature_service:
+          type: string
+          description: Name of a feature service (alternative to listing features).
+        entities:
+          type: object
+          additionalProperties:
+            type: array
+            items: {}
+          description: Entity key-value pairs for feature lookup.
+        full_feature_names:
+          type: boolean
+          default: false
+          description: Whether to return full feature names (feature_view__feature_name).
+
+    GetOnlineFeaturesResponse:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            feature_names:
+              type: array
+              items:
+                type: string
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              values:
+                type: array
+                items: {}
+              statuses:
+                type: array
+                items:
+                  type: string
+              event_timestamps:
+                type: array
+                items:
+                  type: string
+                  format: date-time
+
+    GetOnlineDocumentsRequest:
+      type: object
+      properties:
+        features:
+          type: array
+          items:
+            type: string
+        feature_service:
+          type: string
+        query:
+          type: array
+          items:
+            type: number
+          description: Query embedding vector for similarity search.
+        query_string:
+          type: string
+          description: Text query string (API v2).
+        top_k:
+          type: integer
+          default: 5
+          description: Number of top results to return.
+        api_version:
+          type: integer
+          default: 1
+
+    PushFeaturesRequest:
+      type: object
+      required:
+        - push_source_name
+        - df
+      properties:
+        push_source_name:
+          type: string
+          description: Name of the push source.
+        df:
+          type: object
+          additionalProperties:
+            type: array
+            items: {}
+          description: DataFrame as a dict of column arrays.
+        to:
+          type: string
+          enum:
+            - online
+            - offline
+            - online_and_offline
+          default: online
+          description: Target store(s) to push to.
+        allow_registry_cache:
+          type: boolean
+          default: true
+        transform_on_write:
+          type: boolean
+          default: false
+
+    WriteToFeatureStoreRequest:
+      type: object
+      required:
+        - feature_view_name
+        - df
+      properties:
+        feature_view_name:
+          type: string
+        df:
+          type: object
+          additionalProperties:
+            type: array
+            items: {}
+        allow_registry_cache:
+          type: boolean
+          default: true
+        transform_on_write:
+          type: boolean
+          default: false
+
+    MaterializeRequest:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        feature_views:
+          type: array
+          items:
+            type: string
+          description: Specific feature views to materialize (empty = all).
+
+    MaterializeIncrementalRequest:
+      type: object
+      properties:
+        end_date:
+          type: string
+          format: date-time
+        feature_views:
+          type: array
+          items:
+            type: string
+          description: Specific feature views to materialize (empty = all).

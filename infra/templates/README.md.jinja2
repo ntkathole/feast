@@ -16,6 +16,25 @@
 [![GitHub Release](https://img.shields.io/github/v/release/feast-dev/feast.svg?style=flat&sort=semver&color=blue)](https://github.com/feast-dev/feast/releases)
 
 
+## Quick Start
+
+```bash
+pip install feast            # Install Feast
+feast init my_feature_repo   # Create a new feature repository
+cd my_feature_repo/feature_repo
+feast apply                  # Register features and set up your store
+feast ui                     # Explore in the web UI
+```
+
+**Development setup:**
+
+```bash
+git clone https://github.com/feast-dev/feast.git && cd feast
+make install-python-dependencies-dev   # Install all dev dependencies
+make test-python-unit                  # Run unit tests
+make lint-python                       # Run linters
+```
+
 ## Join us on Slack!
 👋👋👋 [Come say hi on Slack!](https://communityinviter.com/apps/feastopensource/feast-the-open-source-feature-store)
 
