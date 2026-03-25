@@ -15,7 +15,7 @@ data:
       path: data/online_store.db
     batch_engine:
       type: spark.engine
-      execution_mode: operator
+      execution_mode: kubernetes
       namespace: feast-rag
       image: feast/spark-rag:latest
       service_account_name: feast-spark

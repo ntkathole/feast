@@ -61,8 +61,8 @@ class SparkComputeEngineConfig(FeastConfigBaseModel):
 
     # --- Kubernetes cluster fields ---
 
-    execution_mode: Literal["local", "remote", "operator"] = "local"
-    """Execution mode: 'local' (default), 'remote' (direct SparkSession to K8s), or 'operator' (SparkApplication CRDs)"""
+    execution_mode: Literal["local", "remote", "kubernetes"] = "local"
+    """Execution mode: 'local' (default), 'remote' (direct SparkSession to K8s), or 'kubernetes' (SparkApplication CRDs via Spark Operator)"""
 
     master_url: Optional[StrictStr] = None
     """Spark master URL (e.g., k8s://https://kubernetes.default.svc). Required when execution_mode is 'remote'."""
@@ -126,10 +126,10 @@ class SparkComputeEngineConfig(FeastConfigBaseModel):
                 raise ValueError(
                     "master_url must use k8s:// scheme for Kubernetes clusters"
                 )
-        if self.execution_mode == "operator":
+        if self.execution_mode == "kubernetes":
             if not self.image:
                 raise ValueError(
-                    "image is required when execution_mode is 'operator'"
+                    "image is required when execution_mode is 'kubernetes'"
                 )
         if self.kubeconfig_path:
             expanded = os.path.expanduser(self.kubeconfig_path)
@@ -217,7 +217,7 @@ class SparkComputeEngine(ComputeEngine):
         job_id = f"{task.feature_view.name}-{task.start_time}-{task.end_time}"
 
         # Operator mode: delegate to SparkOperatorJobSubmitter
-        if isinstance(config, SparkComputeEngineConfig) and config.execution_mode == "operator":
+        if isinstance(config, SparkComputeEngineConfig) and config.execution_mode == "kubernetes":
             return self._materialize_via_operator(config, task, job_id)
 
         # Local or remote mode: use SparkSession directly

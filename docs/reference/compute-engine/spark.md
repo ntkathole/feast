@@ -46,7 +46,7 @@ When Kubernetes mode is configured on the compute engine, the Spark offline stor
 |------|-------------|
 | `local` | Default. Uses local SparkSession (existing behavior). |
 | `remote` | Connects to an external Spark cluster via `k8s://` master URL. |
-| `operator` | Submits SparkApplication CRDs to the Spark Operator on Kubernetes. |
+| `kubernetes` | Submits SparkApplication CRDs to the Spark Operator on Kubernetes. |
 
 ### Remote Mode Example
 
@@ -69,13 +69,13 @@ batch_engine:
 ```
 {% endcode %}
 
-### Operator Mode Example
+### Kubernetes Mode Example
 
 {% code title="feature_store.yaml" %}
 ```yaml
 batch_engine:
   type: spark.engine
-  execution_mode: operator
+  execution_mode: kubernetes
   namespace: feast-spark
   image: feast/spark:latest
   service_account_name: feast-spark
@@ -89,11 +89,11 @@ batch_engine:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `execution_mode` | string | `local` | Execution mode: `local`, `remote`, or `operator` |
+| `execution_mode` | string | `local` | Execution mode: `local`, `remote`, or `kubernetes` |
 | `master_url` | string | - | Spark master URL (`k8s://...`). Required for `remote` mode. |
 | `namespace` | string | `default` | Kubernetes namespace for Spark jobs |
 | `kubeconfig_path` | string | - | Path to kubeconfig file. Uses in-cluster auth if not set. |
-| `image` | string | - | Default Spark container image. Required for `operator` mode. |
+| `image` | string | - | Default Spark container image. Required for `kubernetes` mode. |
 | `driver_image` | string | - | Override image for the driver pod |
 | `executor_image` | string | - | Override image for executor pods |
 | `image_pull_secrets` | list | `[]` | Kubernetes image pull secret names |

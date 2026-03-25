@@ -358,7 +358,7 @@ class SparkOperatorJobSubmitter:
                 SPARK_K8S_JOBS_TOTAL.labels(
                     status=job.status.value.lower() or "unknown",
                     feature_view=job.feature_view_name,
-                    execution_mode="operator",
+                    execution_mode="kubernetes",
                 ).inc()
                 SPARK_K8S_JOB_DURATION.labels(
                     feature_view=job.feature_view_name,

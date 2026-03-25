@@ -19,7 +19,7 @@ from feast.infra.compute_engines.spark.compute import (
 
 def _make_operator_config(**overrides):
     defaults = {
-        "execution_mode": "operator",
+        "execution_mode": "kubernetes",
         "image": "feast/spark:latest",
         "namespace": "feast-jobs",
         "service_account_name": "spark-sa",

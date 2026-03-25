@@ -54,14 +54,14 @@ python pipeline/query.py --query "How does feature serving work?"
 
 ### Option B: Spark Operator Mode
 
-Uses `execution_mode: operator` — Feast submits SparkApplication CRDs.
+Uses `execution_mode: kubernetes` — Feast submits SparkApplication CRDs.
 
 ```bash
 # 1. Create namespace and RBAC
 kubectl apply -f k8s/feast-config.yaml
 
-# 2. Update feature_store.yaml to use operator mode
-# Set execution_mode: operator in feature_store.yaml
+# 2. Update feature_store.yaml to use kubernetes mode
+# Set execution_mode: kubernetes in feature_store.yaml
 
 # 3. Apply Feast project
 feast apply
@@ -73,7 +73,7 @@ kubectl apply -f k8s/spark-application.yaml
 kubectl get sparkapplications -n feast-rag
 kubectl logs feast-rag-embed-driver -n feast-rag
 
-# 6. Materialize (uses operator mode)
+# 6. Materialize (uses kubernetes mode)
 feast materialize 2024-01-01T00:00:00 2025-12-31T23:59:59
 
 # 7. Query
@@ -86,7 +86,7 @@ python pipeline/query.py --query "How does feature serving work?"
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| `execution_mode` | `local`, `remote`, or `operator` | `local` |
+| `execution_mode` | `local`, `remote`, or `kubernetes` | `local` |
 | `master_url` | K8s API server URL (required for remote) | - |
 | `namespace` | K8s namespace for Spark jobs | `default` |
 | `image` | Spark container image | - |

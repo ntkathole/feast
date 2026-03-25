@@ -108,15 +108,15 @@ def test_remote_requires_executor_instances_gte_1():
 
 def test_operator_requires_image():
     with pytest.raises(ValidationError, match="image is required"):
-        SparkComputeEngineConfig(execution_mode="operator")
+        SparkComputeEngineConfig(execution_mode="kubernetes")
 
 
 def test_operator_valid_config():
     config = SparkComputeEngineConfig(
-        execution_mode="operator",
+        execution_mode="kubernetes",
         image="feast/spark:latest",
     )
-    assert config.execution_mode == "operator"
+    assert config.execution_mode == "kubernetes"
     assert config.image == "feast/spark:latest"
 
 
@@ -125,7 +125,7 @@ def test_operator_requires_executor_instances_gte_1():
         ValidationError, match="executor_instances must be >= 1"
     ):
         SparkComputeEngineConfig(
-            execution_mode="operator",
+            execution_mode="kubernetes",
             image="feast/spark:latest",
             executor_instances=0,
         )

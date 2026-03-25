@@ -1,6 +1,6 @@
 """Materialization entrypoint for Spark Operator driver pods.
 
-This script runs inside the Spark driver container when execution_mode is 'operator'.
+This script runs inside the Spark driver container when execution_mode is 'kubernetes'.
 It deserializes the Feast config, loads the feature view, and runs materialization.
 """
 
