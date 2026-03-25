@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from feast.errors import FeastSparkClusterError
-from feast.infra.compute_engines.spark.byos.config import (
+from feast.infra.compute_engines.spark.kubernetes.config import (
     ConfigMapRef,
     SecretRef,
 )
@@ -24,13 +24,13 @@ def _make_remote_config(**overrides):
 
 @patch("kubernetes.client.CoreV1Api")
 @patch(
-    "feast.infra.compute_engines.spark.byos.auth.get_k8s_api_client"
+    "feast.infra.compute_engines.spark.kubernetes.auth.get_k8s_api_client"
 )
 def test_validate_connectivity_success(
     mock_get_client, mock_core_v1
 ):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_api_client = MagicMock()
@@ -39,7 +39,7 @@ def test_validate_connectivity_success(
     mock_core_v1.return_value = mock_v1
 
     config = _make_remote_config()
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     result = connector.validate_connectivity(config)
 
     assert result is True
@@ -50,11 +50,11 @@ def test_validate_connectivity_success(
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.auth.get_k8s_api_client"
+    "feast.infra.compute_engines.spark.kubernetes.auth.get_k8s_api_client"
 )
 def test_validate_connectivity_auth_failure(mock_get_client):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_get_client.side_effect = FeastSparkClusterError(
@@ -62,7 +62,7 @@ def test_validate_connectivity_auth_failure(mock_get_client):
     )
 
     config = _make_remote_config()
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
 
     with pytest.raises(
         FeastSparkClusterError, match="Failed to authenticate"
@@ -72,13 +72,13 @@ def test_validate_connectivity_auth_failure(mock_get_client):
 
 @patch("kubernetes.client.CoreV1Api")
 @patch(
-    "feast.infra.compute_engines.spark.byos.auth.get_k8s_api_client"
+    "feast.infra.compute_engines.spark.kubernetes.auth.get_k8s_api_client"
 )
 def test_validate_connectivity_unreachable(
     mock_get_client, mock_core_v1
 ):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_api_client = MagicMock()
@@ -90,7 +90,7 @@ def test_validate_connectivity_unreachable(
     )
 
     config = _make_remote_config()
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
 
     with pytest.raises(FeastSparkClusterError, match="Cannot connect"):
         connector.validate_connectivity(config)
@@ -98,13 +98,13 @@ def test_validate_connectivity_unreachable(
 
 @patch("kubernetes.client.CoreV1Api")
 @patch(
-    "feast.infra.compute_engines.spark.byos.auth.get_k8s_api_client"
+    "feast.infra.compute_engines.spark.kubernetes.auth.get_k8s_api_client"
 )
 def test_validate_connectivity_uses_kubeconfig(
     mock_get_client, mock_core_v1
 ):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_api_client = MagicMock()
@@ -119,7 +119,7 @@ def test_validate_connectivity_uses_kubeconfig(
         kubeconfig_path = f.name
 
     config = _make_remote_config(kubeconfig_path=kubeconfig_path)
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.validate_connectivity(config)
 
     mock_get_client.assert_called_once_with(kubeconfig_path)
@@ -131,13 +131,13 @@ def test_validate_connectivity_uses_kubeconfig(
 
 @patch("kubernetes.client.CoreV1Api")
 @patch(
-    "feast.infra.compute_engines.spark.byos.auth.get_k8s_api_client"
+    "feast.infra.compute_engines.spark.kubernetes.auth.get_k8s_api_client"
 )
 def test_validate_connectivity_custom_namespace(
     mock_get_client, mock_core_v1
 ):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_api_client = MagicMock()
@@ -146,7 +146,7 @@ def test_validate_connectivity_custom_namespace(
     mock_core_v1.return_value = mock_v1
 
     config = _make_remote_config(namespace="feast-jobs")
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.validate_connectivity(config)
 
     mock_v1.list_namespaced_pod.assert_called_once_with(
@@ -155,11 +155,11 @@ def test_validate_connectivity_custom_namespace(
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_basic(mock_spark_session):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -170,11 +170,11 @@ def test_create_spark_session_basic(mock_spark_session):
     mock_builder.getOrCreate.return_value = mock_session
 
     config = _make_remote_config()
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     result = connector.create_spark_session(config)
 
     assert result == mock_session
-    mock_builder.appName.assert_called_once_with("feast-byos")
+    mock_builder.appName.assert_called_once_with("feast-spark-k8s")
     mock_builder.config.assert_called_once()
     call_args = mock_builder.config.call_args
     spark_conf = (
@@ -191,11 +191,11 @@ def test_create_spark_session_basic(mock_spark_session):
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_with_images(mock_spark_session):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -209,7 +209,7 @@ def test_create_spark_session_with_images(mock_spark_session):
         driver_image="feast/spark:driver",
         executor_image="feast/spark:executor",
     )
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.create_spark_session(config)
 
     call_args = mock_builder.config.call_args
@@ -234,13 +234,13 @@ def test_create_spark_session_with_images(mock_spark_session):
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_with_service_account(
     mock_spark_session,
 ):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -250,7 +250,7 @@ def test_create_spark_session_with_service_account(
     mock_builder.getOrCreate.return_value = MagicMock()
 
     config = _make_remote_config(service_account_name="spark-sa")
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.create_spark_session(config)
 
     call_args = mock_builder.config.call_args
@@ -265,11 +265,11 @@ def test_create_spark_session_with_service_account(
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_with_secrets(mock_spark_session):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -281,7 +281,7 @@ def test_create_spark_session_with_secrets(mock_spark_session):
     config = _make_remote_config(
         secrets=[SecretRef(name="s3-creds", mount_path="/mnt/s3")]
     )
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.create_spark_session(config)
 
     call_args = mock_builder.config.call_args
@@ -302,11 +302,11 @@ def test_create_spark_session_with_secrets(mock_spark_session):
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_resource_config(mock_spark_session):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -322,7 +322,7 @@ def test_create_spark_session_resource_config(mock_spark_session):
         driver_memory="2g",
         driver_cores=2,
     )
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.create_spark_session(config)
 
     call_args = mock_builder.config.call_args
@@ -340,11 +340,11 @@ def test_create_spark_session_resource_config(mock_spark_session):
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_user_overrides(mock_spark_session):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -359,7 +359,7 @@ def test_create_spark_session_user_overrides(mock_spark_session):
             "spark.custom.key": "value",
         },
     )
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.create_spark_session(config)
 
     call_args = mock_builder.config.call_args
@@ -375,11 +375,11 @@ def test_create_spark_session_user_overrides(mock_spark_session):
 
 
 @patch(
-    "feast.infra.compute_engines.spark.byos.connector.SparkSession"
+    "feast.infra.compute_engines.spark.kubernetes.connector.SparkSession"
 )
 def test_create_spark_session_image_pull_secrets(mock_spark_session):
-    from feast.infra.compute_engines.spark.byos.connector import (
-        BYOSConnector,
+    from feast.infra.compute_engines.spark.kubernetes.connector import (
+        SparkKubernetesConnector,
     )
 
     mock_builder = MagicMock()
@@ -391,7 +391,7 @@ def test_create_spark_session_image_pull_secrets(mock_spark_session):
     config = _make_remote_config(
         image_pull_secrets=["regcred", "ghcr-secret"]
     )
-    connector = BYOSConnector()
+    connector = SparkKubernetesConnector()
     connector.create_spark_session(config)
 
     call_args = mock_builder.config.call_args

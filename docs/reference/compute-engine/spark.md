@@ -34,9 +34,11 @@ batch_engine:
 ```
 {% endcode %}
 
-## BYOS (Bring Your Own Spark) Configuration
+## Spark on Kubernetes Configuration
 
-The Spark engine supports connecting to external Spark clusters on Kubernetes via BYOS mode. This allows Feast to execute transformations, materialization, and historical retrieval on your own Spark infrastructure.
+The Spark engine supports connecting to external Spark clusters on Kubernetes. This allows Feast to execute transformations, materialization, and historical retrieval on your own Spark infrastructure.
+
+When Kubernetes mode is configured on the compute engine, the Spark offline store will automatically share the same remote SparkSession — no separate configuration is needed.
 
 ### Execution Modes
 
@@ -83,7 +85,7 @@ batch_engine:
 ```
 {% endcode %}
 
-### BYOS Configuration Fields
+### Kubernetes Configuration Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -108,19 +110,23 @@ batch_engine:
 
 ### Authentication
 
-BYOS supports two Kubernetes authentication methods:
+Spark on Kubernetes supports two authentication methods:
 
 1. **In-cluster service account** (default when running inside K8s): Automatically uses the pod's mounted service account token.
 2. **Kubeconfig file**: Set `kubeconfig_path` to your kubeconfig file for remote development and CI/CD.
 
+### Offline Store Integration
+
+When `execution_mode` is set to `remote`, the Spark offline store (`offline_store: spark`) automatically shares the same Kubernetes-connected SparkSession. This means both `batch_engine` and `offline_store` operations run on the same remote cluster without any additional configuration.
+
 ### Observability
 
-When `metrics_enabled: true`, BYOS exposes Prometheus metrics:
+When `metrics_enabled: true`, Spark on Kubernetes exposes Prometheus metrics:
 
-- `feast_byos_spark_jobs_total`: Total jobs submitted (counter)
-- `feast_byos_spark_job_duration_seconds`: Job duration (histogram)
-- `feast_byos_spark_active_jobs`: Currently running jobs (gauge)
-- `feast_byos_spark_cluster_connectivity`: Cluster connectivity status (gauge)
+- `feast_spark_k8s_jobs_total`: Total jobs submitted (counter)
+- `feast_spark_k8s_job_duration_seconds`: Job duration (histogram)
+- `feast_spark_k8s_active_jobs`: Currently running jobs (gauge)
+- `feast_spark_k8s_cluster_connectivity`: Cluster connectivity status (gauge)
 
 ## Example in Python
 

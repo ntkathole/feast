@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from feast.errors import FeastSparkClusterError
-from feast.infra.compute_engines.spark.byos.auth import get_k8s_api_client
+from feast.infra.compute_engines.spark.kubernetes.auth import get_k8s_api_client
 
 
-@patch("feast.infra.compute_engines.spark.byos.auth.config")
-@patch("feast.infra.compute_engines.spark.byos.auth.client")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.config")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.client")
 def test_in_cluster_auth(mock_client, mock_config):
     mock_api_client = MagicMock()
     mock_client.ApiClient.return_value = mock_api_client
@@ -21,8 +21,8 @@ def test_in_cluster_auth(mock_client, mock_config):
     assert result == mock_api_client
 
 
-@patch("feast.infra.compute_engines.spark.byos.auth.config")
-@patch("feast.infra.compute_engines.spark.byos.auth.client")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.config")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.client")
 def test_kubeconfig_auth(mock_client, mock_config):
     mock_api_client = MagicMock()
     mock_client.ApiClient.return_value = mock_api_client
@@ -52,7 +52,7 @@ def test_nonexistent_kubeconfig_raises():
         get_k8s_api_client(kubeconfig_path="/nonexistent/kubeconfig")
 
 
-@patch("feast.infra.compute_engines.spark.byos.auth.config")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.config")
 def test_in_cluster_auth_failure_wraps_error(mock_config):
     mock_config.load_incluster_config.side_effect = Exception(
         "Service account not found"
@@ -65,7 +65,7 @@ def test_in_cluster_auth_failure_wraps_error(mock_config):
         get_k8s_api_client(kubeconfig_path=None)
 
 
-@patch("feast.infra.compute_engines.spark.byos.auth.config")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.config")
 def test_kubeconfig_load_failure_wraps_error(mock_config):
     mock_config.load_kube_config.side_effect = Exception(
         "Invalid kubeconfig"
@@ -87,8 +87,8 @@ def test_kubeconfig_load_failure_wraps_error(mock_config):
         os.unlink(kubeconfig_path)
 
 
-@patch("feast.infra.compute_engines.spark.byos.auth.config")
-@patch("feast.infra.compute_engines.spark.byos.auth.client")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.config")
+@patch("feast.infra.compute_engines.spark.kubernetes.auth.client")
 def test_kubeconfig_tilde_expansion(mock_client, mock_config):
     mock_api_client = MagicMock()
     mock_client.ApiClient.return_value = mock_api_client

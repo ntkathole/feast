@@ -57,7 +57,7 @@ class SparkOperatorJobSubmitter:
 
     def _get_api_client(self):
         if self._api_client is None:
-            from feast.infra.compute_engines.spark.byos.auth import (
+            from feast.infra.compute_engines.spark.kubernetes.auth import (
                 get_k8s_api_client,
             )
 
@@ -307,7 +307,7 @@ class SparkOperatorJobSubmitter:
                 "mode": "cluster",
                 "image": config.image,
                 "imagePullPolicy": "IfNotPresent",
-                "mainApplicationFile": "local:///opt/feast/byos/main.py",
+                "mainApplicationFile": "local:///opt/feast/kubernetes/main.py",
                 "arguments": [
                     f"--feature-view={task.feature_view.name}",
                     f"--start-date={task.start_time.isoformat()}",
@@ -338,11 +338,11 @@ class SparkOperatorJobSubmitter:
 
     def _update_active_jobs_metric(self, namespace: str, delta: int):
         try:
-            from feast.infra.compute_engines.spark.byos.metrics import (
-                BYOS_ACTIVE_JOBS,
+            from feast.infra.compute_engines.spark.kubernetes.metrics import (
+                SPARK_K8S_ACTIVE_JOBS,
             )
 
-            BYOS_ACTIVE_JOBS.labels(namespace=namespace).inc(delta)
+            SPARK_K8S_ACTIVE_JOBS.labels(namespace=namespace).inc(delta)
         except Exception:
             logger.debug("Failed to update active jobs metric", exc_info=True)
 
@@ -350,17 +350,17 @@ class SparkOperatorJobSubmitter:
         if job.submit_time and job.completion_time:
             duration = (job.completion_time - job.submit_time).total_seconds()
             try:
-                from feast.infra.compute_engines.spark.byos.metrics import (
-                    BYOS_JOB_DURATION,
-                    BYOS_JOBS_TOTAL,
+                from feast.infra.compute_engines.spark.kubernetes.metrics import (
+                    SPARK_K8S_JOB_DURATION,
+                    SPARK_K8S_JOBS_TOTAL,
                 )
 
-                BYOS_JOBS_TOTAL.labels(
+                SPARK_K8S_JOBS_TOTAL.labels(
                     status=job.status.value.lower() or "unknown",
                     feature_view=job.feature_view_name,
                     execution_mode="operator",
                 ).inc()
-                BYOS_JOB_DURATION.labels(
+                SPARK_K8S_JOB_DURATION.labels(
                     feature_view=job.feature_view_name,
                     operation="materialize",
                 ).observe(duration)

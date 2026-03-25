@@ -534,10 +534,10 @@ class ZeroColumnQueryResult(FeastError):
 
 
 class FeastSparkClusterError(FeastError):
-    """Raised when BYOS Spark cluster connectivity or authentication fails."""
+    """Raised when Spark Kubernetes cluster connectivity or authentication fails."""
 
     def __init__(self, details: str):
-        super().__init__(f"BYOS Spark cluster error: {details}")
+        super().__init__(f"Spark Kubernetes cluster error: {details}")
 
 
 class FeastSparkOperatorError(FeastError):
@@ -548,7 +548,7 @@ class FeastSparkOperatorError(FeastError):
 
 
 class FeastSparkTimeoutError(FeastError):
-    """Raised when a BYOS Spark job exceeds the configured timeout."""
+    """Raised when a Spark Kubernetes job exceeds the configured timeout."""
 
     def __init__(self, job_id: str, timeout_seconds: int):
         super().__init__(

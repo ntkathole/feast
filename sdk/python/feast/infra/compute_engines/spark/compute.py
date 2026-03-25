@@ -22,7 +22,7 @@ from feast.infra.common.materialization_job import (
 from feast.infra.common.retrieval_task import HistoricalRetrievalTask
 from feast.infra.common.serde import SerializedArtifacts
 from feast.infra.compute_engines.base import ComputeEngine
-from feast.infra.compute_engines.spark.byos.config import ConfigMapRef, SecretRef
+from feast.infra.compute_engines.spark.kubernetes.config import ConfigMapRef, SecretRef
 from feast.infra.compute_engines.spark.feature_builder import SparkFeatureBuilder
 from feast.infra.compute_engines.spark.job import (
     SparkDAGRetrievalJob,
@@ -59,7 +59,7 @@ class SparkComputeEngineConfig(FeastConfigBaseModel):
     partitions: int = 0
     """Number of partitions to use when writing data to online store. If 0, no repartitioning is done"""
 
-    # --- BYOS fields ---
+    # --- Kubernetes cluster fields ---
 
     execution_mode: Literal["local", "remote", "operator"] = "local"
     """Execution mode: 'local' (default), 'remote' (direct SparkSession to K8s), or 'operator' (SparkApplication CRDs)"""
@@ -116,7 +116,7 @@ class SparkComputeEngineConfig(FeastConfigBaseModel):
     """Enable Prometheus metrics exposition"""
 
     @model_validator(mode="after")
-    def _validate_byos_config(self):
+    def _validate_k8s_config(self):
         if self.execution_mode == "remote":
             if not self.master_url:
                 raise ValueError(
@@ -159,9 +159,11 @@ class SparkComputeEngine(ComputeEngine):
     ):
         config = self.repo_config.batch_engine
         if isinstance(config, SparkComputeEngineConfig) and config.execution_mode != "local":
-            from feast.infra.compute_engines.spark.byos.connector import BYOSConnector
+            from feast.infra.compute_engines.spark.kubernetes.connector import (
+                SparkKubernetesConnector,
+            )
 
-            connector = BYOSConnector()
+            connector = SparkKubernetesConnector()
             connector.validate_connectivity(config)
 
     def teardown_infra(
@@ -178,9 +180,11 @@ class SparkComputeEngine(ComputeEngine):
         spark_conf: Optional[Dict[str, str]] = None,
     ) -> SparkSession:
         if config.execution_mode == "remote":
-            from feast.infra.compute_engines.spark.byos.connector import BYOSConnector
+            from feast.infra.compute_engines.spark.kubernetes.connector import (
+                SparkKubernetesConnector,
+            )
 
-            connector = BYOSConnector()
+            connector = SparkKubernetesConnector()
             return connector.create_spark_session(config)
         return get_or_create_new_spark_session(spark_conf)
 
@@ -246,7 +250,7 @@ class SparkComputeEngine(ComputeEngine):
 
                 self._record_job_metrics(config, task.feature_view.name, "materialize", "succeeded", duration)
                 logger.info(
-                    "BYOS materialization completed",
+                    "Spark Kubernetes materialization completed",
                     extra={
                         "job_id": job_id,
                         "feature_view": task.feature_view.name,
@@ -269,7 +273,7 @@ class SparkComputeEngine(ComputeEngine):
                 from feast.errors import FeastSparkClusterError
 
                 logger.error(
-                    "BYOS materialization failed",
+                    "Spark Kubernetes materialization failed",
                     extra={
                         "job_id": job_id,
                         "feature_view": task.feature_view.name,
@@ -294,7 +298,7 @@ class SparkComputeEngine(ComputeEngine):
         task: MaterializationTask,
         job_id: str,
     ) -> MaterializationJob:
-        from feast.infra.compute_engines.spark.byos.operator import (
+        from feast.infra.compute_engines.spark.kubernetes.operator import (
             SparkOperatorJobSubmitter,
         )
 
@@ -418,7 +422,7 @@ class SparkComputeEngine(ComputeEngine):
                 from feast.errors import FeastSparkClusterError
 
                 logger.error(
-                    "BYOS historical retrieval failed",
+                    "Spark Kubernetes historical retrieval failed",
                     extra={
                         "feature_view": task.feature_view.name,
                         "cluster": config.master_url,
@@ -457,19 +461,19 @@ class SparkComputeEngine(ComputeEngine):
         if not config.metrics_enabled:
             return
         try:
-            from feast.infra.compute_engines.spark.byos.metrics import (
-                BYOS_JOB_DURATION,
-                BYOS_JOBS_TOTAL,
+            from feast.infra.compute_engines.spark.kubernetes.metrics import (
+                SPARK_K8S_JOB_DURATION,
+                SPARK_K8S_JOBS_TOTAL,
             )
 
-            BYOS_JOBS_TOTAL.labels(
+            SPARK_K8S_JOBS_TOTAL.labels(
                 status=status,
                 feature_view=feature_view,
                 execution_mode=config.execution_mode,
             ).inc()
-            BYOS_JOB_DURATION.labels(
+            SPARK_K8S_JOB_DURATION.labels(
                 feature_view=feature_view,
                 operation=operation,
             ).observe(duration)
         except Exception:
-            logger.debug("Failed to record BYOS metrics", exc_info=True)
+            logger.debug("Failed to record Spark K8s metrics", exc_info=True)

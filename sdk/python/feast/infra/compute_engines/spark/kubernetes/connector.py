@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class BYOSConnector:
+class SparkKubernetesConnector:
     """Manages connection to external Spark clusters on Kubernetes."""
 
     def validate_connectivity(self, config: "SparkComputeEngineConfig") -> bool:
@@ -20,11 +20,13 @@ class BYOSConnector:
             FeastSparkClusterError: If the cluster is unreachable or auth fails.
         """
         from feast.errors import FeastSparkClusterError
-        from feast.infra.compute_engines.spark.byos.auth import get_k8s_api_client
+        from feast.infra.compute_engines.spark.kubernetes.auth import (
+            get_k8s_api_client,
+        )
 
         cluster_address = config.master_url or "unknown"
         logger.info(
-            "Validating BYOS Spark cluster connectivity",
+            "Validating Spark Kubernetes cluster connectivity",
             extra={
                 "cluster_address": cluster_address,
                 "namespace": config.namespace,
@@ -43,7 +45,7 @@ class BYOSConnector:
             )
 
             logger.info(
-                "BYOS Spark cluster connectivity validated",
+                "Spark Kubernetes cluster connectivity validated",
                 extra={
                     "cluster_address": cluster_address,
                     "namespace": config.namespace,
@@ -65,7 +67,7 @@ class BYOSConnector:
     def create_spark_session(self, config: "SparkComputeEngineConfig") -> SparkSession:
         """Create a SparkSession connected to an external Kubernetes Spark cluster.
 
-        Maps BYOS config fields to spark.kubernetes.* configuration keys.
+        Maps compute engine config fields to spark.kubernetes.* configuration keys.
         """
         spark_conf_dict = {}
 
@@ -126,7 +128,7 @@ class BYOSConnector:
             spark_conf_dict.update(config.spark_conf)
 
         logger.info(
-            "Creating BYOS SparkSession",
+            "Creating Spark Kubernetes session",
             extra={
                 "cluster_address": config.master_url,
                 "namespace": config.namespace,
@@ -135,7 +137,7 @@ class BYOSConnector:
             },
         )
 
-        spark_builder = SparkSession.builder.appName("feast-byos")
+        spark_builder = SparkSession.builder.appName("feast-spark-k8s")
         spark_builder = spark_builder.config(
             conf=SparkConf().setAll(list(spark_conf_dict.items()))
         )
@@ -146,11 +148,11 @@ class BYOSConnector:
     def _update_connectivity_metric(self, cluster_address: str, connected: bool):
         """Update the Prometheus connectivity gauge."""
         try:
-            from feast.infra.compute_engines.spark.byos.metrics import (
-                BYOS_CLUSTER_CONNECTIVITY,
+            from feast.infra.compute_engines.spark.kubernetes.metrics import (
+                SPARK_K8S_CLUSTER_CONNECTIVITY,
             )
 
-            BYOS_CLUSTER_CONNECTIVITY.labels(
+            SPARK_K8S_CLUSTER_CONNECTIVITY.labels(
                 cluster_address=cluster_address,
             ).set(1 if connected else 0)
         except Exception:

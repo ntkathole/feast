@@ -2,7 +2,7 @@
 
 This example demonstrates an end-to-end Retrieval-Augmented Generation (RAG) pipeline using:
 - **Feast** for feature management and serving
-- **Spark** (via BYOS) for distributed embedding computation
+- **Spark on Kubernetes** for distributed embedding computation
 - **Kubernetes** for orchestration via the Spark Operator
 
 ## Architecture

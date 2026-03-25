@@ -7,7 +7,7 @@ from feast.errors import (
     FeastSparkOperatorError,
     FeastSparkTimeoutError,
 )
-from feast.infra.compute_engines.spark.byos.operator import (
+from feast.infra.compute_engines.spark.kubernetes.operator import (
     SparkApplicationJob,
     SparkApplicationStatus,
     SparkOperatorJobSubmitter,
@@ -49,22 +49,22 @@ def _make_job(**overrides):
 
 
 _SUBMIT_PATCH = (
-    "feast.infra.compute_engines.spark.byos.operator"
+    "feast.infra.compute_engines.spark.kubernetes.operator"
     ".SparkOperatorJobSubmitter._get_custom_objects_api"
 )
 
 _CLIENT_PATCH = (
-    "feast.infra.compute_engines.spark.byos.operator"
+    "feast.infra.compute_engines.spark.kubernetes.operator"
     ".SparkOperatorJobSubmitter._get_api_client"
 )
 
 _STATUS_PATCH = (
-    "feast.infra.compute_engines.spark.byos.operator"
+    "feast.infra.compute_engines.spark.kubernetes.operator"
     ".SparkOperatorJobSubmitter.get_status"
 )
 
 _CORE_PATCH = (
-    "feast.infra.compute_engines.spark.byos.operator"
+    "feast.infra.compute_engines.spark.kubernetes.operator"
     ".SparkOperatorJobSubmitter._get_core_v1_api"
 )
 
@@ -132,7 +132,7 @@ def test_submit_failure_raises_operator_error(
 def test_crd_includes_secrets_and_configmaps(
     mock_get_client, mock_get_api
 ):
-    from feast.infra.compute_engines.spark.byos.config import (
+    from feast.infra.compute_engines.spark.kubernetes.config import (
         ConfigMapRef,
         SecretRef,
     )
@@ -222,7 +222,7 @@ def test_get_status_failed_with_error(
 
 @patch(_STATUS_PATCH)
 @patch(
-    "feast.infra.compute_engines.spark.byos.operator.time.sleep"
+    "feast.infra.compute_engines.spark.kubernetes.operator.time.sleep"
 )
 def test_wait_for_completion_completed(
     mock_sleep, mock_get_status
@@ -246,7 +246,7 @@ def test_wait_for_completion_completed(
 
 @patch(_STATUS_PATCH)
 @patch(
-    "feast.infra.compute_engines.spark.byos.operator.time.sleep"
+    "feast.infra.compute_engines.spark.kubernetes.operator.time.sleep"
 )
 def test_wait_for_completion_failed(
     mock_sleep, mock_get_status
@@ -272,10 +272,10 @@ def test_wait_for_completion_failed(
 
 @patch(_STATUS_PATCH)
 @patch(
-    "feast.infra.compute_engines.spark.byos.operator.time.time"
+    "feast.infra.compute_engines.spark.kubernetes.operator.time.time"
 )
 @patch(
-    "feast.infra.compute_engines.spark.byos.operator.time.sleep"
+    "feast.infra.compute_engines.spark.kubernetes.operator.time.sleep"
 )
 def test_wait_for_completion_timeout(
     mock_sleep, mock_time, mock_get_status

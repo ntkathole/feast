@@ -91,7 +91,7 @@ class SparkOfflineStore(OfflineStore):
         end_date: datetime,
     ) -> RetrievalJob:
         spark_session = get_spark_session_or_start_new_with_repoconfig(
-            config.offline_store
+            config.offline_store, repo_config=config
         )
         assert isinstance(config.offline_store, SparkOfflineStoreConfig)
         assert isinstance(data_source, SparkSource)
@@ -175,7 +175,7 @@ class SparkOfflineStore(OfflineStore):
         )
 
         spark_session = get_spark_session_or_start_new_with_repoconfig(
-            store_config=config.offline_store
+            store_config=config.offline_store, repo_config=config
         )
         tmp_entity_df_table_name = offline_utils.get_temp_entity_table_name()
 
@@ -321,7 +321,7 @@ class SparkOfflineStore(OfflineStore):
             )
 
         spark_session = get_spark_session_or_start_new_with_repoconfig(
-            store_config=config.offline_store
+            store_config=config.offline_store, repo_config=config
         )
 
         if feature_view.batch_source.path:
@@ -378,7 +378,7 @@ class SparkOfflineStore(OfflineStore):
         )
 
         spark_session = get_spark_session_or_start_new_with_repoconfig(
-            store_config=config.offline_store
+            store_config=config.offline_store, repo_config=config
         )
 
         timestamp_fields = [timestamp_field]
@@ -604,7 +604,18 @@ class SparkRetrievalJob(RetrievalJob):
 
 def get_spark_session_or_start_new_with_repoconfig(
     store_config: SparkOfflineStoreConfig,
+    repo_config: Optional[RepoConfig] = None,
 ) -> SparkSession:
+    # If a Kubernetes-configured compute engine is active, reuse its session
+    # so both batch_engine and offline_store share the same remote cluster.
+    if repo_config is not None:
+        session = _get_k8s_spark_session_from_engine(repo_config)
+        if session is not None:
+            session.conf.set(
+                "spark.sql.parser.quotedRegexColumnNames", "true"
+            )
+            return session
+
     spark_session = SparkSession.getActiveSession()
     if not spark_session:
         spark_builder = SparkSession.builder
@@ -617,6 +628,33 @@ def get_spark_session_or_start_new_with_repoconfig(
         spark_session = spark_builder.getOrCreate()
     spark_session.conf.set("spark.sql.parser.quotedRegexColumnNames", "true")
     return spark_session
+
+
+def _get_k8s_spark_session_from_engine(
+    repo_config: RepoConfig,
+) -> Optional[SparkSession]:
+    """If the batch engine is a Spark engine with remote K8s mode, create or
+    return the shared SparkSession connected to the Kubernetes cluster."""
+    try:
+        from feast.infra.compute_engines.spark.compute import (
+            SparkComputeEngineConfig,
+        )
+
+        engine_config = repo_config.batch_engine
+        if (
+            isinstance(engine_config, SparkComputeEngineConfig)
+            and engine_config.execution_mode == "remote"
+        ):
+            from feast.infra.compute_engines.spark.kubernetes.connector import (
+                SparkKubernetesConnector,
+            )
+
+            connector = SparkKubernetesConnector()
+            return connector.create_spark_session(engine_config)
+    except Exception:
+        # Fall back to default local session creation
+        pass
+    return None
 
 
 def _compute_non_entity_dates(

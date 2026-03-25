@@ -4,7 +4,7 @@ import tempfile
 import pytest
 from pydantic import ValidationError
 
-from feast.infra.compute_engines.spark.byos.config import (
+from feast.infra.compute_engines.spark.kubernetes.config import (
     ConfigMapRef,
     SecretRef,
 )

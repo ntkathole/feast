@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Feast BYOS Materialization Job")
+    parser = argparse.ArgumentParser(
+        description="Feast Spark Kubernetes Materialization Job"
+    )
     parser.add_argument("--feature-view", required=True, help="Feature view name")
     parser.add_argument("--start-date", required=True, help="Start date (ISO format)")
     parser.add_argument("--end-date", required=True, help="End date (ISO format)")
@@ -30,7 +32,7 @@ def main():
     )
 
     logger.info(
-        "Starting Feast BYOS materialization",
+        "Starting Feast Spark Kubernetes materialization",
         extra={
             "feature_view": args.feature_view,
             "start_date": args.start_date,
@@ -60,13 +62,13 @@ def main():
         )
 
         logger.info(
-            "Feast BYOS materialization completed successfully",
+            "Feast Spark Kubernetes materialization completed successfully",
             extra={"feature_view": args.feature_view},
         )
 
     except Exception as e:
         logger.error(
-            "Feast BYOS materialization failed",
+            "Feast Spark Kubernetes materialization failed",
             extra={
                 "feature_view": args.feature_view,
                 "error": str(e),
