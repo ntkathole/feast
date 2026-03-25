@@ -533,6 +533,31 @@ class ZeroColumnQueryResult(FeastError):
         super().__init__(f"This query returned zero columns:\n{query}")
 
 
+class FeastSparkClusterError(FeastError):
+    """Raised when BYOS Spark cluster connectivity or authentication fails."""
+
+    def __init__(self, details: str):
+        super().__init__(f"BYOS Spark cluster error: {details}")
+
+
+class FeastSparkOperatorError(FeastError):
+    """Raised when Spark Operator job submission or execution fails."""
+
+    def __init__(self, details: str):
+        super().__init__(f"Spark Operator error: {details}")
+
+
+class FeastSparkTimeoutError(FeastError):
+    """Raised when a BYOS Spark job exceeds the configured timeout."""
+
+    def __init__(self, job_id: str, timeout_seconds: int):
+        super().__init__(
+            f"Spark job '{job_id}' exceeded timeout of {timeout_seconds}s"
+        )
+        self.job_id = job_id
+        self.timeout_seconds = timeout_seconds
+
+
 class FeastPermissionError(FeastError, PermissionError):
     def __init__(self, details: str):
         super().__init__(f"Permission error:\n{details}")

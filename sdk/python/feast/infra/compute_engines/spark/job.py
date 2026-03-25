@@ -71,11 +71,15 @@ class SparkMaterializationJob(MaterializationJob):
         job_id: str,
         status: MaterializationJobStatus,
         error: Optional[BaseException] = None,
+        cluster_address: Optional[str] = None,
+        namespace: Optional[str] = None,
     ) -> None:
         super().__init__()
         self._job_id: str = job_id
         self._status: MaterializationJobStatus = status
         self._error: Optional[BaseException] = error
+        self._cluster_address: Optional[str] = cluster_address
+        self._namespace: Optional[str] = namespace
 
     def status(self) -> MaterializationJobStatus:
         return self._status
@@ -88,3 +92,11 @@ class SparkMaterializationJob(MaterializationJob):
 
     def job_id(self) -> str:
         return self._job_id
+
+    @property
+    def cluster_address(self) -> Optional[str]:
+        return self._cluster_address
+
+    @property
+    def namespace(self) -> Optional[str]:
+        return self._namespace

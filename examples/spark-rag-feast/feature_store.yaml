@@ -1,0 +1,29 @@
+project: spark_rag_feast
+registry: data/registry.db
+provider: local
+
+offline_store:
+  type: spark
+  spark_conf:
+    spark.sql.session.timeZone: "UTC"
+
+online_store:
+  type: sqlite
+  path: data/online_store.db
+
+batch_engine:
+  type: spark.engine
+  execution_mode: remote
+  master_url: k8s://https://kubernetes.default.svc
+  namespace: feast-rag
+  image: feast/spark-rag:latest
+  service_account_name: feast-spark
+  executor_instances: 3
+  executor_memory: 2g
+  executor_cores: 1
+  driver_memory: 1g
+  driver_cores: 1
+  job_timeout_seconds: 1800
+  metrics_enabled: true
+  spark_conf:
+    spark.jars.packages: "io.delta:delta-spark_2.12:3.1.0"

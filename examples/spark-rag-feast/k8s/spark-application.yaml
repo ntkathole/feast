@@ -1,0 +1,42 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: feast-rag-embed
+  namespace: feast-rag
+  labels:
+    app.kubernetes.io/managed-by: feast
+    feast.dev/pipeline: spark-rag
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: feast/spark-rag:latest
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///opt/feast/pipeline/embed.py
+  arguments:
+    - --input-path=s3a://feast-data/document_chunks/
+    - --output-path=s3a://feast-data/document_embeddings/
+    - --model-name=all-MiniLM-L6-v2
+  sparkVersion: "3.5"
+  sparkConf:
+    spark.kubernetes.container.image.pullPolicy: IfNotPresent
+    spark.sql.execution.arrow.pyspark.enabled: "true"
+  restartPolicy:
+    type: OnFailure
+    onFailureRetries: 3
+    onFailureRetryInterval: 30
+    onSubmissionFailureRetries: 3
+    onSubmissionFailureRetryInterval: 30
+  timeToLiveSeconds: 300
+  driver:
+    cores: 1
+    memory: 2g
+    serviceAccount: feast-spark
+    labels:
+      feast.dev/role: driver
+  executor:
+    cores: 1
+    memory: 4g
+    instances: 3
+    labels:
+      feast.dev/role: executor

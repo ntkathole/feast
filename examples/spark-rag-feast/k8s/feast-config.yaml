@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feast-config
+  namespace: feast-rag
+data:
+  feature_store.yaml: |
+    project: spark_rag_feast
+    registry: data/registry.db
+    provider: local
+    offline_store:
+      type: spark
+    online_store:
+      type: sqlite
+      path: data/online_store.db
+    batch_engine:
+      type: spark.engine
+      execution_mode: operator
+      namespace: feast-rag
+      image: feast/spark-rag:latest
+      service_account_name: feast-spark
+      executor_instances: 3
+      executor_memory: 2g
+      executor_cores: 1
+      driver_memory: 1g
+      driver_cores: 1
+      job_timeout_seconds: 1800
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: feast-spark
+  namespace: feast-rag
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: feast-spark-operator-submitter
+  namespace: feast-rag
+rules:
+  - apiGroups: ["sparkoperator.k8s.io"]
+    resources: ["sparkapplications"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: ["sparkoperator.k8s.io"]
+    resources: ["sparkapplications/status"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: feast-spark-operator-submitter
+  namespace: feast-rag
+subjects:
+  - kind: ServiceAccount
+    name: feast-spark
+    namespace: feast-rag
+roleRef:
+  kind: Role
+  name: feast-spark-operator-submitter
+  apiGroup: rbac.authorization.k8s.io

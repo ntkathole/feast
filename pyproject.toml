@@ -105,7 +105,7 @@ oracle = ["ibis-framework[oracle]>=10.0.0"]
 mysql = ["pymysql", "types-PyMySQL"]
 openlineage = ["openlineage-python>=1.40.0"]
 opentelemetry = ["prometheus_client", "psutil"]
-spark = ["pyspark>=4.0.0"]
+spark = ["pyspark>=4.0.0", "kubernetes>=28.1.0", "prometheus_client>=0.20.0"]
 trino = ["trino>=0.305.0,<0.400.0", "regex"]
 postgres = ["psycopg[binary,pool]==3.2.5"]
 # psycopg[c] install requires a system with a C compiler, python dev headers, & postgresql client dev headers
