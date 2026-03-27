@@ -388,18 +388,14 @@ def get_app(
             )
 
             if store._get_provider().async_supported.online.read:
-                response = await store.get_online_features_async(**read_params)  # type: ignore
+                response_dict = await store.get_online_features_dict_async(
+                    **read_params
+                )  # type: ignore
             else:
-                response = await run_in_threadpool(
-                    lambda: store.get_online_features(**read_params)  # type: ignore
+                response_dict = await run_in_threadpool(
+                    lambda: store.get_online_features_dict(**read_params)  # type: ignore
                 )
 
-            response_dict = await run_in_threadpool(
-                MessageToDict,
-                response.proto,
-                preserving_proto_field_name=True,
-                float_precision=18,
-            )
             return response_dict
 
     @app.post(

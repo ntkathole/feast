@@ -43,9 +43,12 @@ def mock_fs_factory():
         fs = MagicMock()
         fs._get_provider.return_value = provider
         empty_response = OnlineResponse(GetOnlineFeaturesResponse(results=[]))
+        empty_dict_response = {"results": [], "metadata": {"feature_names": []}}
         fs.get_online_features = MagicMock(return_value=empty_response)
         fs.push = MagicMock()
         fs.get_online_features_async = AsyncMock(return_value=empty_response)
+        fs.get_online_features_dict = MagicMock(return_value=empty_dict_response)
+        fs.get_online_features_dict_async = AsyncMock(return_value=empty_dict_response)
         fs.push_async = AsyncMock()
         return fs
 
@@ -90,8 +93,8 @@ def test_get_online_features_async_supported(async_online_read, mock_fs_factory)
     fs = mock_fs_factory(online_read=async_online_read)
     client = TestClient(get_app(fs))
     client.post("/get-online-features", json=get_online_features_body())
-    assert fs.get_online_features.call_count == int(not async_online_read)
-    assert fs.get_online_features_async.await_count == int(async_online_read)
+    assert fs.get_online_features_dict.call_count == int(not async_online_read)
+    assert fs.get_online_features_dict_async.await_count == int(async_online_read)
 
 
 @pytest.mark.parametrize(
@@ -698,13 +701,37 @@ def _build_online_response_with_features():
     return OnlineResponse(proto)
 
 
+def _build_online_response_dict_with_features():
+    """Build a dict response matching the fast dict path output (proto_json.patch format)."""
+    return {
+        "results": [
+            {
+                "values": [123],
+                "statuses": ["PRESENT"],
+                "event_timestamps": ["1970-01-01T00:00:00Z"],
+            },
+            {
+                "values": [42.0],
+                "statuses": ["PRESENT"],
+                "event_timestamps": ["1970-01-01T00:00:00Z"],
+            },
+            {
+                "values": [-73.5],
+                "statuses": ["PRESENT"],
+                "event_timestamps": ["1970-01-01T00:00:00Z"],
+            },
+        ],
+        "metadata": {"feature_names": ["driver_id", "driver_lat", "driver_long"]},
+    }
+
+
 @pytest.mark.parametrize("async_online_read", [True, False])
 def test_get_online_features_non_empty_response(async_online_read, mock_fs_factory):
     """Non-empty responses must pass FastAPI response_model validation (no 500)."""
     fs = mock_fs_factory(online_read=async_online_read)
-    response_obj = _build_online_response_with_features()
-    fs.get_online_features = MagicMock(return_value=response_obj)
-    fs.get_online_features_async = AsyncMock(return_value=response_obj)
+    response_dict = _build_online_response_dict_with_features()
+    fs.get_online_features_dict = MagicMock(return_value=response_dict)
+    fs.get_online_features_dict_async = AsyncMock(return_value=response_dict)
 
     client = TestClient(get_app(fs))
     resp = client.post("/get-online-features", json=get_online_features_body())

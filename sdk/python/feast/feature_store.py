@@ -2668,6 +2668,51 @@ class FeatureStore:
             include_feature_view_version_metadata=include_feature_view_version_metadata,
         )
 
+    def get_online_features_dict(
+        self,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[Value], RepeatedValue]],
+        ],
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> dict:
+        """Return online features as a JSON-ready dict, bypassing proto
+        construction and ``MessageToDict`` for lower latency."""
+        provider = self._get_provider()
+        return provider.get_online_features_dict(
+            config=self.config,
+            features=features,
+            entity_rows=entity_rows,
+            registry=self.registry,
+            project=self.project,
+            full_feature_names=full_feature_names,
+            include_feature_view_version_metadata=include_feature_view_version_metadata,
+        )
+
+    async def get_online_features_dict_async(
+        self,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[Value], RepeatedValue]],
+        ],
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> dict:
+        """Async variant of ``get_online_features_dict``."""
+        provider = self._get_provider()
+        return await provider.get_online_features_dict_async(
+            config=self.config,
+            features=features,
+            entity_rows=entity_rows,
+            registry=self.registry,
+            project=self.project,
+            full_feature_names=full_feature_names,
+            include_feature_view_version_metadata=include_feature_view_version_metadata,
+        )
+
     def retrieve_online_documents(
         self,
         query: Union[str, List[float]],

@@ -1617,13 +1617,12 @@ def _convert_rows_to_protobuf(
     read_rows: List[Tuple[Optional[datetime], Optional[Dict[str, ValueProto]]]],
 ) -> List[Tuple[List[Timestamp], List["FieldStatus.ValueType"], List[ValueProto]]]:
     n_rows = len(read_rows)
+    n_features = len(requested_features)
 
     null_value = ValueProto()
-    null_status = FieldStatus.NOT_FOUND
-    present_status = FieldStatus.PRESENT
+    PRESENT = FieldStatus.PRESENT
+    NOT_FOUND = FieldStatus.NOT_FOUND
 
-    # Pre-compute timestamps once per entity (not per feature)
-    # This reduces O(features * entities) to O(entities) for timestamp conversion
     row_timestamps = []
     for row_ts, _ in read_rows:
         ts_proto = Timestamp()
@@ -1631,17 +1630,246 @@ def _convert_rows_to_protobuf(
             ts_proto.FromDatetime(row_ts)
         row_timestamps.append(ts_proto)
 
-    requested_features_vectors = []
-    for feature_name in requested_features:
-        ts_vector = list(row_timestamps)  # Shallow copy of pre-computed timestamps
-        status_vector = [null_status] * n_rows
-        value_vector = [null_value] * n_rows
-        for idx, (_, feature_data) in enumerate(read_rows):
-            if (feature_data is not None) and (feature_name in feature_data):
-                status_vector[idx] = present_status
-                value_vector[idx] = feature_data[feature_name]
-        requested_features_vectors.append((ts_vector, status_vector, value_vector))
-    return requested_features_vectors
+    status_vectors = [[NOT_FOUND] * n_rows for _ in range(n_features)]
+    value_vectors = [[null_value] * n_rows for _ in range(n_features)]
+
+    feat_idx_map = {name: i for i, name in enumerate(requested_features)}
+
+    for row_idx, (_, feature_data) in enumerate(read_rows):
+        if feature_data is None:
+            continue
+        for feat_name, feat_val in feature_data.items():
+            f_idx = feat_idx_map.get(feat_name)
+            if f_idx is not None:
+                status_vectors[f_idx][row_idx] = PRESENT
+                value_vectors[f_idx][row_idx] = feat_val
+
+    return [
+        (list(row_timestamps), status_vectors[i], value_vectors[i])
+        for i in range(n_features)
+    ]
+
+
+def _populate_response_from_read_rows(
+    requested_features: List[str],
+    read_rows: List[Tuple[Optional[datetime], Optional[Dict[str, ValueProto]]]],
+    indexes: Iterable[List[int]],
+    online_features_response: GetOnlineFeaturesResponse,
+    full_feature_names: bool,
+    table: "FeatureView",
+    output_len: int,
+    include_feature_view_version_metadata: bool = False,
+):
+    """Fused processing: read_rows -> populated response in a single pass.
+
+    Replaces the separate ``_convert_rows_to_protobuf`` +
+    ``_populate_response_from_feature_data`` +
+    ``construct_response_feature_vector`` chain, avoiding intermediate
+    vector allocations and multiple iterations over the data.
+    """
+    n_features = len(requested_features)
+
+    table_name = table.projection.name_to_use()
+    clean_table_name = table.projection.name_alias or table.projection.name
+    feature_refs = [
+        f"{table_name}__{fn}" if full_feature_names else fn for fn in requested_features
+    ]
+    online_features_response.metadata.feature_names.val.extend(feature_refs)
+
+    if include_feature_view_version_metadata:
+        existing_names = [
+            fvm.name for fvm in online_features_response.metadata.feature_view_metadata
+        ]
+        if clean_table_name not in existing_names:
+            fv_metadata = online_features_response.metadata.feature_view_metadata.add()
+            fv_metadata.name = clean_table_name
+            fv_metadata.version = getattr(table, "current_version_number", 0) or 0
+
+    null_value = ValueProto()
+    null_ts = Timestamp()
+    PRESENT = FieldStatus.PRESENT
+    NOT_FOUND = FieldStatus.NOT_FOUND
+
+    row_ts_protos = []
+    for row_ts, _ in read_rows:
+        ts = Timestamp()
+        if row_ts is not None:
+            ts.FromDatetime(row_ts)
+        row_ts_protos.append(ts)
+
+    # Build timestamp template at output_len — shared across all features.
+    ts_template = [null_ts] * output_len
+    indexes_tuple = tuple(indexes)
+    for row_idx, destinations in enumerate(indexes_tuple):
+        ts = row_ts_protos[row_idx]
+        for out_idx in destinations:
+            ts_template[out_idx] = ts
+
+    # Allocate output arrays directly at final output_len.
+    feat_values = [[null_value] * output_len for _ in range(n_features)]
+    feat_statuses = [[NOT_FOUND] * output_len for _ in range(n_features)]
+
+    # Single pass over rows: distribute feature values to output positions.
+    feat_idx_map = {name: i for i, name in enumerate(requested_features)}
+    for row_idx, (_, feature_data) in enumerate(read_rows):
+        if feature_data is None:
+            continue
+        destinations = indexes_tuple[row_idx]
+        for feat_name, feat_val in feature_data.items():
+            f_idx = feat_idx_map.get(feat_name)
+            if f_idx is not None:
+                for out_idx in destinations:
+                    feat_values[f_idx][out_idx] = feat_val
+                    feat_statuses[f_idx][out_idx] = PRESENT
+
+    for f_idx in range(n_features):
+        online_features_response.results.append(
+            GetOnlineFeaturesResponse.FeatureVector(
+                values=feat_values[f_idx],
+                statuses=feat_statuses[f_idx],
+                event_timestamps=list(ts_template),
+            )
+        )
+
+
+_STATUS_NAMES = {
+    FieldStatus.INVALID: "INVALID",
+    FieldStatus.PRESENT: "PRESENT",
+    FieldStatus.NOT_FOUND: "NOT_FOUND",
+    FieldStatus.NULL_VALUE: "NULL_VALUE",
+    FieldStatus.OUTSIDE_MAX_AGE: "OUTSIDE_MAX_AGE",
+}
+
+
+def _value_proto_to_native(val: ValueProto) -> Any:
+    """Convert a ValueProto to a native Python value.
+
+    Matches the format produced by ``proto_json.patch()`` which the feature
+    server applies at startup — scalar values are returned as-is, lists are
+    returned as plain Python lists, and null/unset values become ``None``.
+    """
+    which = val.WhichOneof("val")
+    if which is None or which == "null_val":
+        return None
+    if "_list_" in which or "_set_" in which:
+        return list(getattr(val, which).val)
+    return getattr(val, which)
+
+
+def _build_response_dict_from_read_rows(
+    requested_features: List[str],
+    read_rows: List[Tuple[Optional[datetime], Optional[Dict[str, ValueProto]]]],
+    indexes: Iterable[List[int]],
+    full_feature_names: bool,
+    table: "FeatureView",
+    output_len: int,
+    include_feature_view_version_metadata: bool = False,
+) -> Dict[str, Any]:
+    """Build the JSON-ready response dict directly from ``online_read`` rows,
+    completely skipping proto construction and ``MessageToDict``.
+
+    The output matches the format produced by ``proto_json.patch()`` +
+    ``MessageToDict`` that the feature server expects:
+    - Values are native Python types (not ``{"field_val": ...}`` dicts).
+    - Feature names are a flat list (not ``{"val": [...]}``)."""
+    n_features = len(requested_features)
+
+    table_name = table.projection.name_to_use()
+    feature_refs = [
+        f"{table_name}__{fn}" if full_feature_names else fn for fn in requested_features
+    ]
+
+    PRESENT = "PRESENT"
+    NOT_FOUND = "NOT_FOUND"
+    NULL_TS = "1970-01-01T00:00:00Z"
+
+    row_ts_strs: List[str] = []
+    for row_ts, _ in read_rows:
+        if row_ts is not None:
+            row_ts_strs.append(row_ts.strftime("%Y-%m-%dT%H:%M:%S") + "Z")
+        else:
+            row_ts_strs.append(NULL_TS)
+
+    ts_template: List[str] = [NULL_TS] * output_len
+    indexes_tuple = tuple(indexes)
+    for row_idx, destinations in enumerate(indexes_tuple):
+        ts_str = row_ts_strs[row_idx]
+        for out_idx in destinations:
+            ts_template[out_idx] = ts_str
+
+    feat_values: List[List[Any]] = [[None] * output_len for _ in range(n_features)]
+    feat_statuses: List[List[str]] = [
+        [NOT_FOUND] * output_len for _ in range(n_features)
+    ]
+
+    feat_idx_map = {name: i for i, name in enumerate(requested_features)}
+    for row_idx, (_, feature_data) in enumerate(read_rows):
+        if feature_data is None:
+            continue
+        destinations = indexes_tuple[row_idx]
+        for feat_name, feat_val in feature_data.items():
+            f_idx = feat_idx_map.get(feat_name)
+            if f_idx is not None:
+                native = _value_proto_to_native(feat_val)
+                for out_idx in destinations:
+                    feat_values[f_idx][out_idx] = native
+                    feat_statuses[f_idx][out_idx] = PRESENT
+
+    results = []
+    for f_idx in range(n_features):
+        results.append(
+            {
+                "values": feat_values[f_idx],
+                "statuses": feat_statuses[f_idx],
+                "event_timestamps": list(ts_template),
+            }
+        )
+
+    resp: Dict[str, Any] = {"results": results}
+
+    metadata: Dict[str, Any] = {"feature_names": list(feature_refs)}
+    if include_feature_view_version_metadata:
+        clean_table_name = table.projection.name_alias or table.projection.name
+        metadata["feature_view_metadata"] = [
+            {
+                "name": clean_table_name,
+                "version": getattr(table, "current_version_number", 0) or 0,
+            }
+        ]
+    resp["metadata"] = metadata
+
+    return resp
+
+
+def _merge_response_dicts(
+    target: Dict[str, Any],
+    source: Dict[str, Any],
+) -> None:
+    """Merge a per-feature-view response dict into the accumulator."""
+    target["results"].extend(source["results"])
+    target_meta = target["metadata"]
+    source_meta = source["metadata"]
+    target_meta["feature_names"].extend(source_meta["feature_names"])
+    if "feature_view_metadata" in source_meta:
+        target_meta.setdefault("feature_view_metadata", []).extend(
+            source_meta["feature_view_metadata"]
+        )
+
+
+def _drop_unneeded_columns_dict(
+    response_dict: Dict[str, Any],
+    requested_result_row_names: Set[str],
+) -> None:
+    """Dict equivalent of ``_drop_unneeded_columns`` for the fast dict path."""
+    feature_names = response_dict["metadata"]["feature_names"]
+    unneeded = [
+        idx
+        for idx, name in enumerate(feature_names)
+        if name not in requested_result_row_names
+    ]
+    for idx in reversed(unneeded):
+        del feature_names[idx]
+        del response_dict["results"][idx]
 
 
 def has_all_tags(

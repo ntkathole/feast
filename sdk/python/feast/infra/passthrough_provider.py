@@ -282,6 +282,52 @@ class PassthroughProvider(Provider):
             include_feature_view_version_metadata=include_feature_view_version_metadata,
         )
 
+    def get_online_features_dict(
+        self,
+        config: RepoConfig,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[ValueProto], RepeatedValue]],
+        ],
+        registry: BaseRegistry,
+        project: str,
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> Dict[str, Any]:
+        return self.online_store.get_online_features_dict(
+            config=config,
+            features=features,
+            entity_rows=entity_rows,
+            registry=registry,
+            project=project,
+            full_feature_names=full_feature_names,
+            include_feature_view_version_metadata=include_feature_view_version_metadata,
+        )
+
+    async def get_online_features_dict_async(
+        self,
+        config: RepoConfig,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[ValueProto], RepeatedValue]],
+        ],
+        registry: BaseRegistry,
+        project: str,
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> Dict[str, Any]:
+        return await self.online_store.get_online_features_dict_async(
+            config=config,
+            features=features,
+            entity_rows=entity_rows,
+            registry=registry,
+            project=project,
+            full_feature_names=full_feature_names,
+            include_feature_view_version_metadata=include_feature_view_version_metadata,
+        )
+
     async def online_read_async(
         self,
         config: RepoConfig,

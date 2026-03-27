@@ -220,17 +220,12 @@ class OnlineStore(ABC):
                 requested_features=requested_features,
             )
 
-            feature_data = utils._convert_rows_to_protobuf(
-                requested_features, read_rows
-            )
-
-            # Populate the result_rows with the Features from the OnlineStore inplace.
-            utils._populate_response_from_feature_data(
-                feature_data,
+            utils._populate_response_from_read_rows(
+                requested_features,
+                read_rows,
                 idxs,
                 online_features_response,
                 full_feature_names,
-                requested_features,
                 table,
                 output_len,
                 include_feature_view_version_metadata,
@@ -356,17 +351,12 @@ class OnlineStore(ABC):
         for (idxs, read_rows, output_len), (table, requested_features) in zip(
             all_responses, grouped_refs
         ):
-            feature_data = utils._convert_rows_to_protobuf(
-                requested_features, read_rows
-            )
-
-            # Populate the result_rows with the Features from the OnlineStore inplace.
-            utils._populate_response_from_feature_data(
-                feature_data,
+            utils._populate_response_from_read_rows(
+                requested_features,
+                read_rows,
                 idxs,
                 online_features_response,
                 full_feature_names,
-                requested_features,
                 table,
                 output_len,
                 include_feature_view_version_metadata,
@@ -389,6 +379,296 @@ class OnlineStore(ABC):
             online_features_response, requested_result_row_names
         )
         return OnlineResponse(online_features_response)
+
+    def get_online_features_dict(
+        self,
+        config: RepoConfig,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[ValueProto], RepeatedValue]],
+        ],
+        registry: BaseRegistry,
+        project: str,
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> Dict[str, Any]:
+        """Return online features as a JSON-ready dict, skipping proto
+        construction and ``MessageToDict`` entirely.
+
+        Falls back to the proto path when on-demand feature views are involved.
+        """
+        if isinstance(entity_rows, list):
+            columnar: Dict[str, List[Any]] = {k: [] for k in entity_rows[0].keys()}
+            for entity_row in entity_rows:
+                for key, value in entity_row.items():
+                    try:
+                        columnar[key].append(value)
+                    except KeyError as e:
+                        raise ValueError(
+                            "All entity_rows must have the same keys."
+                        ) from e
+            entity_rows = columnar
+
+        (
+            join_key_values,
+            grouped_refs,
+            entity_name_to_join_key_map,
+            requested_on_demand_feature_views,
+            feature_refs,
+            requested_result_row_names,
+            online_features_response,
+        ) = utils._prepare_entities_to_read_from_online_store(
+            registry=registry,
+            project=project,
+            features=features,
+            entity_values=entity_rows,
+            full_feature_names=full_feature_names,
+            native_entity_values=True,
+        )
+
+        # ODFVs require the proto response; fall back to the standard path.
+        if requested_on_demand_feature_views:
+            from google.protobuf.json_format import MessageToDict
+
+            self._check_versioned_read_support(grouped_refs)
+            for table, requested_features in grouped_refs:
+                table_entity_values, idxs, output_len = utils._get_unique_entities(
+                    table,
+                    join_key_values,
+                    entity_name_to_join_key_map,
+                )
+                entity_key_protos = utils._get_entity_key_protos(table_entity_values)
+                read_rows = self.online_read(
+                    config=config,
+                    table=table,
+                    entity_keys=entity_key_protos,
+                    requested_features=requested_features,
+                )
+                utils._populate_response_from_read_rows(
+                    requested_features,
+                    read_rows,
+                    idxs,
+                    online_features_response,
+                    full_feature_names,
+                    table,
+                    output_len,
+                    include_feature_view_version_metadata,
+                )
+            utils._augment_response_with_on_demand_transforms(
+                online_features_response,
+                feature_refs,
+                requested_on_demand_feature_views,
+                full_feature_names,
+            )
+            utils._drop_unneeded_columns(
+                online_features_response,
+                requested_result_row_names,
+            )
+            return MessageToDict(
+                online_features_response,
+                preserving_proto_field_name=True,
+                float_precision=18,
+            )
+
+        self._check_versioned_read_support(grouped_refs)
+
+        # Seed response with entity / request-data columns that
+        # _prepare_entities_to_read_from_online_store already placed
+        # into the proto response.
+        entity_names: List[str] = list(
+            online_features_response.metadata.feature_names.val
+        )
+        entity_columns: List[Dict[str, Any]] = [
+            {
+                "values": [utils._value_proto_to_native(v) for v in fv.values],
+                "statuses": [
+                    utils._STATUS_NAMES.get(s, "INVALID") for s in fv.statuses
+                ],
+                "event_timestamps": ["1970-01-01T00:00:00Z"] * len(fv.values),
+            }
+            for fv in online_features_response.results
+        ]
+
+        response_dict: Dict[str, Any] = {
+            "results": entity_columns,
+            "metadata": {"feature_names": entity_names},
+        }
+
+        for table, requested_features in grouped_refs:
+            table_entity_values, idxs, output_len = utils._get_unique_entities(
+                table,
+                join_key_values,
+                entity_name_to_join_key_map,
+            )
+            entity_key_protos = utils._get_entity_key_protos(table_entity_values)
+            read_rows = self.online_read(
+                config=config,
+                table=table,
+                entity_keys=entity_key_protos,
+                requested_features=requested_features,
+            )
+            fv_dict = utils._build_response_dict_from_read_rows(
+                requested_features,
+                read_rows,
+                idxs,
+                full_feature_names,
+                table,
+                output_len,
+                include_feature_view_version_metadata,
+            )
+            utils._merge_response_dicts(response_dict, fv_dict)
+
+        utils._drop_unneeded_columns_dict(response_dict, requested_result_row_names)
+        return response_dict
+
+    async def get_online_features_dict_async(
+        self,
+        config: RepoConfig,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[ValueProto], RepeatedValue]],
+        ],
+        registry: BaseRegistry,
+        project: str,
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> Dict[str, Any]:
+        """Async variant of ``get_online_features_dict``."""
+        if isinstance(entity_rows, list):
+            columnar: Dict[str, List[Any]] = {k: [] for k in entity_rows[0].keys()}
+            for entity_row in entity_rows:
+                for key, value in entity_row.items():
+                    try:
+                        columnar[key].append(value)
+                    except KeyError as e:
+                        raise ValueError(
+                            "All entity_rows must have the same keys."
+                        ) from e
+            entity_rows = columnar
+
+        (
+            join_key_values,
+            grouped_refs,
+            entity_name_to_join_key_map,
+            requested_on_demand_feature_views,
+            feature_refs,
+            requested_result_row_names,
+            online_features_response,
+        ) = utils._prepare_entities_to_read_from_online_store(
+            registry=registry,
+            project=project,
+            features=features,
+            entity_values=entity_rows,
+            full_feature_names=full_feature_names,
+            native_entity_values=True,
+        )
+
+        # ODFVs require the proto response; fall back.
+        if requested_on_demand_feature_views:
+            from google.protobuf.json_format import MessageToDict
+
+            self._check_versioned_read_support(grouped_refs)
+
+            async def _query_table_proto(table, requested_features):
+                tev, idxs, olen = utils._get_unique_entities(
+                    table,
+                    join_key_values,
+                    entity_name_to_join_key_map,
+                )
+                ekp = utils._get_entity_key_protos(tev)
+                rows = await self.online_read_async(
+                    config=config,
+                    table=table,
+                    entity_keys=ekp,
+                    requested_features=requested_features,
+                )
+                return idxs, rows, olen
+
+            all_resp = await asyncio.gather(
+                *[_query_table_proto(t, rf) for t, rf in grouped_refs]
+            )
+            for (idxs, read_rows, olen), (table, rf) in zip(all_resp, grouped_refs):
+                utils._populate_response_from_read_rows(
+                    rf,
+                    read_rows,
+                    idxs,
+                    online_features_response,
+                    full_feature_names,
+                    table,
+                    olen,
+                    include_feature_view_version_metadata,
+                )
+            utils._augment_response_with_on_demand_transforms(
+                online_features_response,
+                feature_refs,
+                requested_on_demand_feature_views,
+                full_feature_names,
+            )
+            utils._drop_unneeded_columns(
+                online_features_response,
+                requested_result_row_names,
+            )
+            return MessageToDict(
+                online_features_response,
+                preserving_proto_field_name=True,
+                float_precision=18,
+            )
+
+        self._check_versioned_read_support(grouped_refs)
+
+        # Seed with entity / request-data columns.
+        entity_names: List[str] = list(
+            online_features_response.metadata.feature_names.val
+        )
+        entity_columns: List[Dict[str, Any]] = [
+            {
+                "values": [utils._value_proto_to_native(v) for v in fv.values],
+                "statuses": [
+                    utils._STATUS_NAMES.get(s, "INVALID") for s in fv.statuses
+                ],
+                "event_timestamps": ["1970-01-01T00:00:00Z"] * len(fv.values),
+            }
+            for fv in online_features_response.results
+        ]
+
+        async def _query_table_dict(table, requested_features):
+            tev, idxs, olen = utils._get_unique_entities(
+                table,
+                join_key_values,
+                entity_name_to_join_key_map,
+            )
+            ekp = utils._get_entity_key_protos(tev)
+            rows = await self.online_read_async(
+                config=config,
+                table=table,
+                entity_keys=ekp,
+                requested_features=requested_features,
+            )
+            return utils._build_response_dict_from_read_rows(
+                requested_features,
+                rows,
+                idxs,
+                full_feature_names,
+                table,
+                olen,
+                include_feature_view_version_metadata,
+            )
+
+        all_dicts = await asyncio.gather(
+            *[_query_table_dict(t, rf) for t, rf in grouped_refs]
+        )
+
+        response_dict: Dict[str, Any] = {
+            "results": entity_columns,
+            "metadata": {"feature_names": entity_names},
+        }
+        for fv_dict in all_dicts:
+            utils._merge_response_dicts(response_dict, fv_dict)
+
+        utils._drop_unneeded_columns_dict(response_dict, requested_result_row_names)
+        return response_dict
 
     @abstractmethod
     def update(

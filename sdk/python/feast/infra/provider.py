@@ -336,6 +336,36 @@ class Provider(ABC):
     ) -> OnlineResponse:
         pass
 
+    def get_online_features_dict(
+        self,
+        config: RepoConfig,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[ValueProto], RepeatedValue]],
+        ],
+        registry: BaseRegistry,
+        project: str,
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> Dict[str, Any]:
+        raise NotImplementedError
+
+    async def get_online_features_dict_async(
+        self,
+        config: RepoConfig,
+        features: Union[List[str], FeatureService],
+        entity_rows: Union[
+            List[Dict[str, Any]],
+            Mapping[str, Union[Sequence[Any], Sequence[ValueProto], RepeatedValue]],
+        ],
+        registry: BaseRegistry,
+        project: str,
+        full_feature_names: bool = False,
+        include_feature_view_version_metadata: bool = False,
+    ) -> Dict[str, Any]:
+        raise NotImplementedError
+
     @abstractmethod
     async def online_read_async(
         self,
