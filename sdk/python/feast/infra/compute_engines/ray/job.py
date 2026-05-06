@@ -1,7 +1,7 @@
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import pandas as pd
 import pyarrow as pa
@@ -26,6 +26,9 @@ from feast.infra.offline_stores.offline_store import RetrievalJob, RetrievalMeta
 from feast.infra.ray_initializer import get_ray_wrapper
 from feast.repo_config import RepoConfig
 from feast.saved_dataset import SavedDatasetStorage
+
+if TYPE_CHECKING:
+    from feast.infra.compute_engines.ray.kuberay_job import KubeRayJobSubmitter
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +261,168 @@ class RayDAGRetrievalJob(RetrievalJob):
             "Dataset should not be None after execution"
         )
         return self._result_dataset.to_pandas().to_arrow()
+
+
+class KubeRayRetrievalJob(RetrievalJob):
+    """
+    Retrieval job that runs ``get_historical_features`` on an ephemeral RayCluster.
+
+    The driver submits a KubeRay RayJob and this object acts as the handle.
+    Results are lazy: the actual cluster execution (and blocking poll) happens
+    the first time the caller calls ``.to_df()``, ``.to_arrow()``, or
+    ``.to_ray_dataset()``.
+
+    This mirrors the standard ``RayDAGRetrievalJob`` API so callers need no
+    special handling:
+
+    .. code-block:: python
+
+        job = store.get_historical_features(entity_df, features)
+        df = job.to_df()           # blocks until RayJob complete, then reads result
+        table = job.to_arrow()     # same, returns Arrow Table
+
+    Parameters
+    ----------
+    job_name:
+        KubeRay RayJob CR name (used for polling).
+    output_path:
+        Staging path (local or remote) where the RayJob writes its parquet result.
+    submitter:
+        ``KubeRayJobSubmitter`` instance used for polling.
+    timeout:
+        Maximum seconds to wait for the job.  ``None`` → 1 hour.
+    full_feature_names:
+        Whether full feature names (``view:feature``) were requested.
+    on_demand_feature_views:
+        Any on-demand feature views to apply after retrieval.
+    feature_refs:
+        Feature references requested (for metadata).
+    """
+
+    def __init__(
+        self,
+        job_name: str,
+        output_path: str,
+        submitter: "KubeRayJobSubmitter",
+        config: RepoConfig,
+        full_feature_names: bool = False,
+        on_demand_feature_views: Optional[List[OnDemandFeatureView]] = None,
+        feature_refs: Optional[List[str]] = None,
+        metadata: Optional[RetrievalMetadata] = None,
+        timeout: Optional[int] = None,
+    ):
+        super().__init__()
+        self._job_name = job_name
+        self._output_path = output_path
+        self._submitter = submitter
+        self._config = config
+        self._full_feature_names = full_feature_names
+        self._on_demand_feature_views = on_demand_feature_views or []
+        self._feature_refs = feature_refs or []
+        self._metadata = metadata
+        self._timeout = timeout
+        self._result_table: Optional[pa.Table] = None
+
+    # ── Lazy execution ──────────────────────────────────────────────────
+
+    def _ensure_completed(self) -> pa.Table:
+        """Block until the RayJob completes and load the result parquet."""
+        if self._result_table is None:
+            logger.info("Waiting for KubeRay retrieval job '%s'…", self._job_name)
+            self._submitter.wait_for_job(self._job_name, timeout=self._timeout)
+
+            import pyarrow.parquet as pq
+
+            logger.info(
+                "Loading historical feature results from '%s'.", self._output_path
+            )
+            self._result_table = pq.read_table(self._output_path)
+            logger.info(
+                "Historical features ready (%d rows, %d columns).",
+                self._result_table.num_rows,
+                self._result_table.num_columns,
+            )
+        return self._result_table
+
+    # ── RetrievalJob interface ──────────────────────────────────────────
+
+    def to_ray_dataset(self) -> Dataset:
+        table = self._ensure_completed()
+        ray_wrapper = get_ray_wrapper()
+        return ray_wrapper.from_arrow(table)
+
+    def _to_df_internal(self, timeout: Optional[int] = None) -> pd.DataFrame:
+        return self._ensure_completed().to_pandas()
+
+    def _to_arrow_internal(self, timeout: Optional[int] = None) -> pa.Table:
+        return self._ensure_completed()
+
+    def to_df(
+        self,
+        validation_reference=None,
+        timeout: Optional[int] = None,
+    ) -> pd.DataFrame:
+        if self._on_demand_feature_views:
+            return super().to_df(
+                validation_reference=validation_reference, timeout=timeout
+            )
+        return self._to_df_internal(timeout=timeout)
+
+    def to_arrow(
+        self,
+        validation_reference=None,
+        timeout: Optional[int] = None,
+    ) -> pa.Table:
+        if self._on_demand_feature_views:
+            return super().to_arrow(
+                validation_reference=validation_reference, timeout=timeout
+            )
+        return self._to_arrow_internal(timeout=timeout)
+
+    def to_remote_storage(self) -> list:
+        """Result is already in remote storage (output_path)."""
+        self._ensure_completed()  # wait for job
+        return [self._output_path]
+
+    def persist(
+        self,
+        storage: SavedDatasetStorage,
+        allow_overwrite: bool = False,
+        timeout: Optional[int] = None,
+    ) -> str:
+        if not isinstance(storage, SavedDatasetFileStorage):
+            raise ValueError(
+                f"KubeRayRetrievalJob only supports SavedDatasetFileStorage, "
+                f"got {type(storage)}"
+            )
+        destination = storage.file_options.uri
+        table = self._ensure_completed()
+
+        import os as _os
+
+        import pyarrow.parquet as pq
+
+        if not allow_overwrite and not destination.startswith(REMOTE_STORAGE_SCHEMES):
+            if _os.path.exists(destination):
+                raise SavedDatasetLocationAlreadyExists(location=destination)
+
+        pq.write_table(table, destination)
+        return destination
+
+    def error(self) -> Optional[BaseException]:
+        return None
+
+    @property
+    def full_feature_names(self) -> bool:
+        return self._full_feature_names
+
+    @property
+    def on_demand_feature_views(self) -> List[OnDemandFeatureView]:
+        return self._on_demand_feature_views
+
+    @property
+    def metadata(self) -> Optional[RetrievalMetadata]:
+        return self._metadata
 
 
 @dataclass

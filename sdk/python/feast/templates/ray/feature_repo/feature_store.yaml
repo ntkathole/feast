@@ -11,7 +11,7 @@ offline_store:
   max_parallelism_multiplier: 1               # Parallelism as multiple of CPU cores
   target_partition_size_mb: 16                # Target partition size (MB)
   enable_ray_logging: false                   # Disable Ray logging for cleaner output
-  # ray_address: "127.0.0.1:10001"            # Ray address
+  # ray_address: "127.0.0.1:10001"            # Ray address for a standalone cluster
 
 # Ray compute engine configuration for distributed feature processing
 batch_engine:
@@ -21,7 +21,42 @@ batch_engine:
   broadcast_join_threshold_mb: 50             # Broadcast join threshold (MB)
   target_partition_size_mb: 32                # Target partition size (MB)
   window_size_for_joins: "1H"                 # Time window for distributed joins
-  # ray_address: "127.0.0.1:10001"            # Ray address
+  # ray_address: "127.0.0.1:10001"            # Ray address for a standalone cluster
+
+  # ── KubeRay / ephemeral cluster (KubeRay operator required) ──────────────
+  # Set use_kuberay: true WITHOUT cluster_name to enable fully-automatic
+  # ephemeral cluster management via a KubeRay RayJob CR.
+  # Feast will create a temporary cluster, run materialisation, and clean up.
+  # No pre-existing Ray cluster or auth credentials required.
+  #
+  # use_kuberay: true
+  # namespace: feast                          # K8s namespace (default: "default")
+  # local_queue: feast-queue                  # Kueue LocalQueue for quota scheduling
+  # ray_image: quay.io/rhoai/ray:2.35.0-py311
+  # rayjob_cluster_config:
+  #   num_workers: 2
+  #   worker_cpu_requests: 2
+  #   worker_cpu_limits: 4
+  #   worker_memory_requests: "4Gi"
+  #   worker_memory_limits: "8Gi"
+  #   head_cpu_requests: 1
+  #   head_cpu_limits: 2
+  #   head_memory_requests: "4Gi"
+  #   head_memory_limits: "8Gi"
+  # extra_pip_packages:                       # Extra pip packages in the runtime env
+  #   - boto3
+  # ray_job_ttl_seconds: 300                  # Cleanup delay after job completes
+  # ray_job_active_deadline_seconds: 3600     # Hard timeout for the job
+  #
+  # ── KubeRay / existing cluster (cluster_name required) ───────────────────
+  # Set both use_kuberay and cluster_name to connect to a pre-provisioned cluster.
+  #
+  # use_kuberay: true
+  # cluster_name: my-raycluster
+  # kuberay_conf:
+  #   namespace: ray-system
+  #   auth_token: <token>
+  #   auth_server: https://api.my-ocp-cluster:6443
 
 # Online store for serving features
 online_store:

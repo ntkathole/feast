@@ -36,6 +36,7 @@ class RayExecutionMode(Enum):
     LOCAL = "local"
     REMOTE = "remote"
     KUBERAY = "kuberay"
+    KUBERAY_JOB = "kuberay_job"
 
 
 class RayConfigManager:
@@ -71,9 +72,10 @@ class RayConfigManager:
 
         Precedence (highest to lowest):
         1. Environment variable FEAST_RAY_EXECUTION_MODE (explicit override)
-        2. KubeRay mode (use_kuberay=True or cluster_name specified)
-        3. Remote mode (ray_address specified)
-        4. Local mode (default fallback)
+        2. KubeRay Job mode (use_kuberay=True, no cluster_name) - ephemeral cluster via RayJob CR
+        3. KubeRay mode (use_kuberay=True with cluster_name, or cluster_name only) - connect to existing cluster
+        4. Remote mode (ray_address specified)
+        5. Local mode (default fallback)
 
         Returns:
             RayExecutionMode enum value
@@ -83,19 +85,21 @@ class RayConfigManager:
 
         # 1. Check environment variable override first (highest precedence)
         env_mode = os.getenv("FEAST_RAY_EXECUTION_MODE", "").lower()
-        if env_mode in ["local", "remote", "kuberay"]:
+        if env_mode in ["local", "remote", "kuberay", "kuberay_job"]:
             self._execution_mode = RayExecutionMode(env_mode)
             logger.info(
                 f"Ray execution mode set via FEAST_RAY_EXECUTION_MODE: {env_mode}"
             )
             return self._execution_mode
 
-        # 2. Check for KubeRay configuration (second highest precedence)
+        # 2 & 3. Check for KubeRay configuration (second highest precedence)
         use_kuberay = self._get_config_value("use_kuberay")
 
-        # Check for cluster_name in kuberay_conf
+        # cluster_name can come from top-level config or kuberay_conf sub-dict
+        cluster_name = self._get_config_value("cluster_name")
         kuberay_conf = self._get_config_value("kuberay_conf", {}) or {}
-        cluster_name = kuberay_conf.get("cluster_name")
+        if not cluster_name:
+            cluster_name = kuberay_conf.get("cluster_name")
 
         # Environment variables can enable KubeRay
         if os.getenv("FEAST_USE_KUBERAY", "").lower() == "true":
@@ -103,18 +107,28 @@ class RayConfigManager:
         if os.getenv("FEAST_RAY_CLUSTER_NAME"):
             cluster_name = os.getenv("FEAST_RAY_CLUSTER_NAME")
 
-        # KubeRay takes precedence over remote/local if configured
         if use_kuberay or cluster_name:
-            self._execution_mode = RayExecutionMode.KUBERAY
-            reason = []
-            if use_kuberay:
-                reason.append("use_kuberay=True")
-            if cluster_name:
-                reason.append(f"cluster_name='{cluster_name}'")
-            logger.info(f"Ray execution mode: KubeRay ({', '.join(reason)})")
+            if use_kuberay and not cluster_name:
+                # Ephemeral mode: Feast manages the full cluster lifecycle via RayJob CR.
+                # No pre-existing cluster required - CodeFlare SDK will create and delete
+                # a temporary RayCluster automatically.
+                self._execution_mode = RayExecutionMode.KUBERAY_JOB
+                logger.info(
+                    "Ray execution mode: KubeRay Job (ephemeral cluster via RayJob CR - "
+                    "no pre-existing cluster required)"
+                )
+            else:
+                # Connect to an already-running RayCluster by name.
+                self._execution_mode = RayExecutionMode.KUBERAY
+                reason = []
+                if use_kuberay:
+                    reason.append("use_kuberay=True")
+                if cluster_name:
+                    reason.append(f"cluster_name='{cluster_name}'")
+                logger.info(f"Ray execution mode: KubeRay ({', '.join(reason)})")
             return self._execution_mode
 
-        # 3. Check for remote Ray configuration (third precedence)
+        # 4. Check for remote Ray configuration (third precedence)
         ray_address = self._get_config_value("ray_address") or os.getenv("RAY_ADDRESS")
 
         if ray_address:
@@ -122,7 +136,7 @@ class RayConfigManager:
             logger.info(f"Ray execution mode: Remote (ray_address='{ray_address}')")
             return self._execution_mode
 
-        # 4. Default to local Ray (lowest precedence - fallback)
+        # 5. Default to local Ray (lowest precedence - fallback)
         self._execution_mode = RayExecutionMode.LOCAL
         logger.info(
             "Ray execution mode: Local (default - no KubeRay or remote configuration found)"
@@ -830,14 +844,25 @@ def ensure_ray_initialized(
 
     # Initialize based on execution mode
     try:
-        if execution_mode == RayExecutionMode.KUBERAY:
+        if execution_mode == RayExecutionMode.KUBERAY_JOB:
+            # Ephemeral RayJob mode: the compute engine submits a KubeRay RayJob CR
+            # that creates its own temporary cluster.  No local ray.init() is needed
+            # on the calling machine - Ray runs entirely inside the remote job.
+            logger.info(
+                "Ray execution mode is KUBERAY_JOB - skipping local ray.init(); "
+                "cluster lifecycle is managed automatically via RayJob CR."
+            )
+            _ray_initialized = True
+        elif execution_mode == RayExecutionMode.KUBERAY:
             _initialize_kuberay(ray_config, enable_logging)
+            _ray_initialized = True
         elif execution_mode == RayExecutionMode.REMOTE:
             _initialize_remote_ray(ray_config, enable_logging)
+            _ray_initialized = True
         else:  # LOCAL
             _initialize_local_ray(ray_config, enable_logging)
+            _ray_initialized = True
 
-        _ray_initialized = True
         logger.info(f"Ray initialized successfully in {execution_mode.value} mode")
 
     except Exception as e:

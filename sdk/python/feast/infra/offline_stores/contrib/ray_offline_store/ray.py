@@ -354,16 +354,30 @@ class RayOfflineStoreConfig(FeastConfigBaseModel):
 
     # KubeRay/CodeFlare SDK configurations
     use_kuberay: Optional[bool] = None
-    """Whether to use KubeRay/CodeFlare SDK for Ray cluster management"""
+    """Whether to use KubeRay/CodeFlare SDK for Ray cluster management.
+
+    When True and no cluster_name is set, the offline store operates in
+    ephemeral KubeRay Job mode (cluster lifecycle managed by the batch engine).
+    """
 
     cluster_name: Optional[str] = None
-    """Name of the KubeRay cluster to connect to (required for KubeRay mode)"""
+    """Name of the KubeRay cluster to connect to.
+    Required only when connecting to an existing pre-provisioned cluster."""
 
     auth_token: Optional[str] = None
-    """Authentication token for Ray cluster connection (for secure clusters)"""
+    """Authentication token for Ray cluster connection (for secure clusters).
+    Only required when connecting to an existing cluster."""
 
     kuberay_conf: Optional[Dict[str, Any]] = None
     """KubeRay/CodeFlare configuration parameters (passed to CodeFlare SDK)"""
+
+    namespace: Optional[str] = None
+    """Kubernetes namespace for the RayJob / existing cluster.
+    Falls back to kuberay_conf['namespace'] and then 'default'."""
+
+    local_queue: Optional[str] = None
+    """Kueue LocalQueue name for scheduling RayJobs through Kueue.
+    Example: 'feast-materialization-queue'"""
 
     # Worker task resource configuration
     num_gpus: Optional[float] = None
