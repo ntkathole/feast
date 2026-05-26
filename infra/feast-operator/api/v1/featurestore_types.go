@@ -358,7 +358,7 @@ type FeatureStoreServices struct {
 	OnlineStore  *OnlineStore  `json:"onlineStore,omitempty"`
 	Registry     *Registry     `json:"registry,omitempty"`
 	// Creates a UI server container
-	UI                 *ServerConfigs             `json:"ui,omitempty"`
+	UI *ServerConfigs `json:"ui,omitempty"`
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 	SecurityContext    *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 	// PodAnnotations are annotations to be applied to the Deployment's PodTemplate metadata.

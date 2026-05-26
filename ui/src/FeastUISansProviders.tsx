@@ -1,9 +1,9 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 
 import "./index.css";
 
 import { Routes, Route } from "react-router-dom";
-import { EuiProvider, EuiErrorBoundary } from "@elastic/eui";
+import { EuiProvider, EuiErrorBoundary, EuiLoadingSpinner } from "@elastic/eui";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 
 import ProjectOverviewPage from "./pages/ProjectOverviewPage";
@@ -40,6 +40,18 @@ import {
 } from "./contexts/ProjectListContext";
 import DataModeContext from "./contexts/DataModeContext";
 import type { DataModeConfig, FetchOptions } from "./contexts/DataModeContext";
+import OperatorContext from "./contexts/OperatorContext";
+import useOperatorStatus from "./hooks/useOperatorStatus";
+
+const ManageFeatureStoresPage = lazy(
+  () => import("./pages/operator/ManageFeatureStoresPage"),
+);
+const CreateFeatureStorePage = lazy(
+  () => import("./pages/operator/CreateFeatureStorePage"),
+);
+const DiscoverPage = lazy(
+  () => import("./pages/operator/DiscoverPage"),
+);
 
 interface FeastUIConfigs {
   tabsRegistry?: FeastTabsRegistryInterface;
@@ -97,6 +109,7 @@ const FeastUISansProvidersInner = ({
   feastUIConfigs?: FeastUIConfigs;
 }) => {
   const { colorMode } = useTheme();
+  const operatorState = useOperatorStatus();
 
   const dataModeConfig: DataModeConfig = {
     fetchOptions: feastUIConfigs?.fetchOptions,
@@ -105,104 +118,138 @@ const FeastUISansProvidersInner = ({
   return (
     <EuiProvider colorMode={colorMode}>
       <EuiErrorBoundary>
-        <DataModeContext.Provider value={dataModeConfig}>
-          <TabsRegistryContext.Provider
-            value={{
-              RegularFeatureViewCustomTabs: [
-                {
-                  label: "CURL Generator",
-                  path: "curl-generator",
-                  Component: CurlGeneratorTab,
-                },
-                ...(feastUIConfigs?.tabsRegistry
-                  ?.RegularFeatureViewCustomTabs || []),
-              ],
-              OnDemandFeatureViewCustomTabs:
-                feastUIConfigs?.tabsRegistry?.OnDemandFeatureViewCustomTabs ||
-                [],
-              StreamFeatureViewCustomTabs:
-                feastUIConfigs?.tabsRegistry?.StreamFeatureViewCustomTabs || [],
-              FeatureServiceCustomTabs:
-                feastUIConfigs?.tabsRegistry?.FeatureServiceCustomTabs || [],
-              FeatureCustomTabs:
-                feastUIConfigs?.tabsRegistry?.FeatureCustomTabs || [],
-              DataSourceCustomTabs:
-                feastUIConfigs?.tabsRegistry?.DataSourceCustomTabs || [],
-              EntityCustomTabs:
-                feastUIConfigs?.tabsRegistry?.EntityCustomTabs || [],
-              DatasetCustomTabs:
-                feastUIConfigs?.tabsRegistry?.DatasetCustomTabs || [],
-            }}
-          >
-            <FeatureFlagsContext.Provider
-              value={feastUIConfigs?.featureFlags || {}}
+        <OperatorContext.Provider value={operatorState}>
+          <DataModeContext.Provider value={dataModeConfig}>
+            <TabsRegistryContext.Provider
+              value={{
+                RegularFeatureViewCustomTabs: [
+                  {
+                    label: "CURL Generator",
+                    path: "curl-generator",
+                    Component: CurlGeneratorTab,
+                  },
+                  ...(feastUIConfigs?.tabsRegistry
+                    ?.RegularFeatureViewCustomTabs || []),
+                ],
+                OnDemandFeatureViewCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.OnDemandFeatureViewCustomTabs ||
+                  [],
+                StreamFeatureViewCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.StreamFeatureViewCustomTabs ||
+                  [],
+                FeatureServiceCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.FeatureServiceCustomTabs || [],
+                FeatureCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.FeatureCustomTabs || [],
+                DataSourceCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.DataSourceCustomTabs || [],
+                EntityCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.EntityCustomTabs || [],
+                DatasetCustomTabs:
+                  feastUIConfigs?.tabsRegistry?.DatasetCustomTabs || [],
+              }}
             >
-              <ProjectListContext.Provider value={projectListContext}>
-                <Routes>
-                  <Route path="/" element={<Layout />}>
-                    <Route index element={<RootProjectSelectionPage />} />
-                    <Route
-                      path="/p/:projectName/*"
-                      element={<NoProjectGuard />}
-                    >
-                      <Route index element={<ProjectOverviewPage />} />
+              <FeatureFlagsContext.Provider
+                value={feastUIConfigs?.featureFlags || {}}
+              >
+                <ProjectListContext.Provider value={projectListContext}>
+                  <Routes>
+                    <Route path="/" element={<Layout />}>
+                      <Route index element={<RootProjectSelectionPage />} />
                       <Route
-                        path="data-source/"
-                        element={<DatasourceIndex />}
-                      />
-                      <Route
-                        path="data-source/:dataSourceName/*"
-                        element={<DataSourceInstance />}
-                      />
-                      <Route path="features/" element={<FeatureListPage />} />
-                      <Route
-                        path="feature-view/"
-                        element={<FeatureViewIndex />}
-                      />
-                      <Route
-                        path="feature-view/:featureViewName/*"
-                        element={<FeatureViewInstance />}
-                      ></Route>
-                      <Route
-                        path="feature-view/:FeatureViewName/feature/:FeatureName/*"
-                        element={<FeatureInstance />}
-                      />
-                      <Route
-                        path="feature-service/"
-                        element={<FeatureServiceIndex />}
-                      />
-                      <Route
-                        path="feature-service/:featureServiceName/*"
-                        element={<FeatureServiceInstance />}
-                      />
-                      <Route path="entity/" element={<EntityIndex />} />
-                      <Route
-                        path="entity/:entityName/*"
-                        element={<EntityInstance />}
-                      />
+                        path="/p/:projectName/*"
+                        element={<NoProjectGuard />}
+                      >
+                        <Route index element={<ProjectOverviewPage />} />
+                        <Route
+                          path="data-source/"
+                          element={<DatasourceIndex />}
+                        />
+                        <Route
+                          path="data-source/:dataSourceName/*"
+                          element={<DataSourceInstance />}
+                        />
+                        <Route
+                          path="features/"
+                          element={<FeatureListPage />}
+                        />
+                        <Route
+                          path="feature-view/"
+                          element={<FeatureViewIndex />}
+                        />
+                        <Route
+                          path="feature-view/:featureViewName/*"
+                          element={<FeatureViewInstance />}
+                        ></Route>
+                        <Route
+                          path="feature-view/:FeatureViewName/feature/:FeatureName/*"
+                          element={<FeatureInstance />}
+                        />
+                        <Route
+                          path="feature-service/"
+                          element={<FeatureServiceIndex />}
+                        />
+                        <Route
+                          path="feature-service/:featureServiceName/*"
+                          element={<FeatureServiceInstance />}
+                        />
+                        <Route path="entity/" element={<EntityIndex />} />
+                        <Route
+                          path="entity/:entityName/*"
+                          element={<EntityInstance />}
+                        />
 
-                      <Route path="data-set/" element={<DatasetIndex />} />
-                      <Route
-                        path="data-set/:datasetName/*"
-                        element={<DatasetInstance />}
-                      />
-                      <Route
-                        path="data-labeling/"
-                        element={<DocumentLabelingPage />}
-                      />
-                      <Route
-                        path="permissions/"
-                        element={<PermissionsIndex />}
-                      />
-                      <Route path="lineage/" element={<LineageIndex />} />
+                        <Route path="data-set/" element={<DatasetIndex />} />
+                        <Route
+                          path="data-set/:datasetName/*"
+                          element={<DatasetInstance />}
+                        />
+                        <Route
+                          path="data-labeling/"
+                          element={<DocumentLabelingPage />}
+                        />
+                        <Route
+                          path="permissions/"
+                          element={<PermissionsIndex />}
+                        />
+                        <Route path="lineage/" element={<LineageIndex />} />
+                      </Route>
+                      {operatorState.enabled && (
+                        <>
+                          <Route
+                            path="/manage"
+                            element={
+                              <Suspense fallback={<EuiLoadingSpinner />}>
+                                <ManageFeatureStoresPage />
+                              </Suspense>
+                            }
+                          />
+                          <Route
+                            path="/create"
+                            element={
+                              <Suspense fallback={<EuiLoadingSpinner />}>
+                                <CreateFeatureStorePage />
+                              </Suspense>
+                            }
+                          />
+                          <Route
+                            path="/discover"
+                            element={
+                              <Suspense fallback={<EuiLoadingSpinner />}>
+                                <DiscoverPage />
+                              </Suspense>
+                            }
+                          />
+                        </>
+                      )}
                     </Route>
-                  </Route>
-                  <Route path="*" element={<NoMatch />} />
-                </Routes>
-              </ProjectListContext.Provider>
-            </FeatureFlagsContext.Provider>
-          </TabsRegistryContext.Provider>
-        </DataModeContext.Provider>
+                    <Route path="*" element={<NoMatch />} />
+                  </Routes>
+                </ProjectListContext.Provider>
+              </FeatureFlagsContext.Provider>
+            </TabsRegistryContext.Provider>
+          </DataModeContext.Provider>
+        </OperatorContext.Provider>
       </EuiErrorBoundary>
     </EuiProvider>
   );

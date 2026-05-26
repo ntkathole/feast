@@ -348,15 +348,12 @@ class CodeFlareRayWrapper:
 
             cluster_uri = self.cluster.cluster_uri()
             runtime_env = {
-                "pip": ["feast"],
                 "env_vars": {"RAY_DISABLE_IMPORT_WARNING": "1"},
             }
             if self.extra_runtime_env:
                 extra_pip = self.extra_runtime_env.get("pip", [])
                 if extra_pip:
-                    runtime_env["pip"] = list(
-                        dict.fromkeys(runtime_env["pip"] + extra_pip)
-                    )
+                    runtime_env["pip"] = extra_pip
                 extra_env_vars = self.extra_runtime_env.get("env_vars", {})
                 if extra_env_vars:
                     runtime_env["env_vars"].update(extra_env_vars)

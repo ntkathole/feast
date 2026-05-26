@@ -79,6 +79,9 @@ func (feast *FeastServices) Deploy() error {
 	if err := feast.createServiceAccount(); err != nil {
 		return err
 	}
+	if err := feast.DeployAuthProxyRBAC(); err != nil {
+		return err
+	}
 	if err := feast.createDeployment(); err != nil {
 		return err
 	}
@@ -467,6 +470,7 @@ func (feast *FeastServices) setContainers(podSpec *corev1.PodSpec) error {
 	}
 	if feast.isUiServer() {
 		feast.setContainer(&podSpec.Containers, UIFeastType, fsYamlB64)
+		feast.setAuthProxySidecar(podSpec)
 	}
 	return nil
 }
@@ -478,6 +482,11 @@ func (feast *FeastServices) setContainer(containers *[]corev1.Container, feastTy
 		cmd := feast.getContainerCommand(feastType)
 		container := getContainer(name, workingDir, cmd, serverConfigs.ContainerConfigs, fsYamlB64)
 		tls := feast.getTlsConfigs(feastType)
+		// When auth proxy is enabled for UI, treat TLS as disabled for container config
+		// (probes, ports) since the UI listens on HTTP behind the proxy.
+		if feastType == UIFeastType && feast.isAuthProxyEnabled() {
+			tls = nil
+		}
 		probeHandler := feast.getProbeHandler(feastType, tls)
 		container.Ports = []corev1.ContainerPort{}
 
@@ -576,19 +585,35 @@ func (feast *FeastServices) setRoute(route *routev1.Route, feastType FeastServic
 	route.Labels = feast.getFeastTypeLabels(feastType)
 
 	tls := feast.getTlsConfigs(feastType)
+	targetPort := getTargetPort(feastType, tls)
+
+	// When auth proxy is enabled for UI, route traffic to the proxy port
+	if feastType == UIFeastType && feast.isAuthProxyEnabled() {
+		targetPort = int32(authProxyPort)
+	}
+
 	route.Spec = routev1.RouteSpec{
 		To: routev1.RouteTargetReference{
 			Kind: "Service",
 			Name: svcName,
 		},
 		Port: &routev1.RoutePort{
-			TargetPort: intstr.FromInt(int(getTargetPort(feastType, tls))),
+			TargetPort: intstr.FromInt(int(targetPort)),
 		},
 	}
 	if tls.IsTLS() {
-		route.Spec.TLS = &routev1.TLSConfig{
-			Termination:                   routev1.TLSTerminationReencrypt,
-			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		// When auth proxy is enabled, use edge termination (TLS terminates at router,
+		// HTTP to oauth-proxy). This avoids needing destinationCACertificate config.
+		if feastType == UIFeastType && feast.isAuthProxyEnabled() {
+			route.Spec.TLS = &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationEdge,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			}
+		} else {
+			route.Spec.TLS = &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationReencrypt,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			}
 		}
 	}
 
@@ -651,7 +676,10 @@ func (feast *FeastServices) getContainerCommand(feastType FeastServiceType) []st
 		}
 	}
 
-	if tls.IsTLS() {
+	// Skip TLS for the UI container when auth proxy is enabled: the proxy handles
+	// external TLS via edge termination, and communicates with UI over HTTP in the same pod.
+	skipTls := feastType == UIFeastType && feast.isAuthProxyEnabled()
+	if tls.IsTLS() && !skipTls {
 		targetPort = deploySettings.TargetHttpsPort
 		feastTlsPath := GetTlsPath(feastType)
 		deploySettings.Args = append(deploySettings.Args, []string{"--key", feastTlsPath + tls.SecretKeyNames.TlsKey,
@@ -836,6 +864,11 @@ func (feast *FeastServices) setService(svc *corev1.Service, feastType FeastServi
 		targetPort = getTargetPort(feastType, tls)
 	}
 
+	// When auth proxy is enabled for UI, route external traffic through the proxy
+	if feastType == UIFeastType && feast.isAuthProxyEnabled() {
+		targetPort = int32(authProxyPort)
+	}
+
 	svc.Spec = corev1.ServiceSpec{
 		Selector: feast.getSelectorLabels(),
 		Type:     corev1.ServiceTypeClusterIP,
@@ -883,6 +916,18 @@ func (feast *FeastServices) createRestService(feastType FeastServiceType) error 
 
 func (feast *FeastServices) setServiceAccount(sa *corev1.ServiceAccount) error {
 	sa.Labels = feast.getLabels()
+
+	// When auth proxy is enabled, annotate the SA with an OAuth redirect reference
+	// pointing to the UI route, so OpenShift accepts it as a valid OAuth client
+	if feast.isAuthProxyEnabled() {
+		if sa.Annotations == nil {
+			sa.Annotations = map[string]string{}
+		}
+		routeName := feast.GetFeastServiceName(UIFeastType)
+		sa.Annotations["serviceaccounts.openshift.io/oauth-redirectreference.feast"] =
+			`{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"` + routeName + `"}}`
+	}
+
 	return controllerutil.SetControllerReference(feast.Handler.FeatureStore, sa, feast.Handler.Scheme)
 }
 
@@ -1278,6 +1323,11 @@ func (feast *FeastServices) isUiServer() bool {
 	appliedServices := feast.Handler.FeatureStore.Status.Applied.Services
 	return appliedServices != nil && appliedServices.UI != nil
 }
+
+func (feast *FeastServices) isAuthProxyEnabled() bool {
+	return feast.shouldInjectAuthProxy()
+}
+
 
 func (feast *FeastServices) initFeastDeploy() *appsv1.Deployment {
 	deploy := &appsv1.Deployment{

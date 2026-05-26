@@ -228,6 +228,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "FeatureStore")
 		os.Exit(1)
 	}
+
+	// Deploy central management UI if enabled
+	if services.IsCentralUIEnabled() {
+		deployer := &services.CentralUIDeployer{Client: mgr.GetClient()}
+		if err := mgr.Add(deployer); err != nil {
+			setupLog.Error(err, "unable to add central UI deployer")
+			os.Exit(1)
+		}
+		setupLog.Info("Central UI auto-deployment enabled")
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

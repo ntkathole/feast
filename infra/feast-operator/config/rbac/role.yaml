@@ -31,6 +31,19 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - users
+  - groups
+  verbs:
+  - impersonate
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
   - pods/exec
   verbs:
   - create

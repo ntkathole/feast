@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from importlib import resources as importlib_resources
 from typing import Dict, List
 
@@ -11,6 +12,32 @@ from fastapi.staticfiles import StaticFiles
 import feast
 
 logger = logging.getLogger(__name__)
+
+
+def _try_enable_operator_routes(app: FastAPI) -> bool:
+    """Conditionally load and mount operator management routes.
+
+    Returns True if operator mode is active. Has zero impact in standalone mode:
+    - If FEAST_OPERATOR_MANAGED env var is not "true", returns immediately.
+    - If `kubernetes` package is not installed, catches ImportError gracefully.
+    """
+    if os.environ.get("FEAST_OPERATOR_MANAGED", "").lower() != "true":
+        return False
+    try:
+        from feast.ui_operator_routes import mount_operator_routes
+
+        mount_operator_routes(app)
+        logger.info("Operator management routes enabled at /api/operator/*")
+        return True
+    except ImportError:
+        logger.info(
+            "Operator routes not available (kubernetes package not installed). "
+            "Install with: pip install feast[k8s]"
+        )
+        return False
+    except Exception as e:
+        logger.warning(f"Failed to enable operator routes: {e}")
+        return False
 
 
 def _build_projects_list(
@@ -96,6 +123,13 @@ def get_app(
     )
 
     _setup_rest_mode(app, store)
+
+    operator_enabled = _try_enable_operator_routes(app)
+
+    @app.get("/api/operator/status")
+    def operator_status():
+        """Returns whether operator management mode is active."""
+        return {"enabled": operator_enabled}
 
     ui_dir_ref = importlib_resources.files(__spec__.parent) / "ui/build/"  # type: ignore[name-defined, arg-type]
     with importlib_resources.as_file(ui_dir_ref) as ui_dir:
@@ -371,9 +405,23 @@ def get_app(
                 "error": "Failed to fetch model data",
             }
 
-    # For all other paths (such as paths that would otherwise be handled by react router), pass to React
+    # For all paths handled by react router, serve the SPA index.html
     @app.api_route("/p/{path_name:path}", methods=["GET"])
-    def catch_all():
+    def catch_all_project():
+        filename = ui_dir.joinpath("index.html")
+        with open(filename) as f:
+            content = f.read()
+        return Response(content, media_type="text/html")
+
+    @app.api_route("/manage{path_name:path}", methods=["GET"])
+    def catch_all_manage():
+        filename = ui_dir.joinpath("index.html")
+        with open(filename) as f:
+            content = f.read()
+        return Response(content, media_type="text/html")
+
+    @app.api_route("/create{path_name:path}", methods=["GET"])
+    def catch_all_create():
         filename = ui_dir.joinpath("index.html")
         with open(filename) as f:
             content = f.read()

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 
 import {
   EuiPage,
@@ -9,13 +9,17 @@ import {
   EuiSpacer,
   EuiFlexGroup,
   EuiFlexItem,
+  EuiSideNav,
+  EuiIcon,
+  htmlIdGenerator,
 } from "@elastic/eui";
-import { Outlet } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router-dom";
 
 import RegistryPathContext from "../contexts/RegistryPathContext";
 import { useParams } from "react-router-dom";
 import { useLoadProjectsList } from "../contexts/ProjectListContext";
 import useLoadRegistry from "../queries/useLoadRegistry";
+import OperatorContext from "../contexts/OperatorContext";
 
 import ProjectSelector from "../components/ProjectSelector";
 import Sidebar from "./Sidebar";
@@ -28,9 +32,6 @@ import GlobalSearchShortcut from "../components/GlobalSearchShortcut";
 import CommandPalette from "../components/CommandPalette";
 
 const Layout = () => {
-  // Registry Path Context has to be inside Layout
-  // because it has to be under routes
-  // in order to use useParams
   let { projectName } = useParams();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const searchRef = useRef<RegistrySearchRef>(null);
@@ -43,18 +44,12 @@ const Layout = () => {
 
   const registryPath = currentProject?.registryPath || "";
 
-  // For global search, use the first available registry path (typically all projects share the same registry)
-  // If projects have different registries, we use the first one as the "global" registry
   const globalRegistryPath =
     projectsData?.projects?.[0]?.registryPath || registryPath;
 
-  // Load filtered data for current project (for sidebar and page-level search)
   const { data } = useLoadRegistry(registryPath, projectName);
-
-  // Load unfiltered data for global search (across all projects)
   const { data: globalData } = useLoadRegistry(globalRegistryPath);
 
-  // Categories for page-level search (filtered to current project)
   const categories = data
     ? [
         {
@@ -95,13 +90,10 @@ const Layout = () => {
       ]
     : [];
 
-  // Helper function to extract project ID from an item
   const getProjectId = (item: any): string => {
-    // Try different possible locations for the project field
     return item?.spec?.project || item?.project || projectName || "unknown";
   };
 
-  // Categories for global search (includes all projects)
   const globalCategories = globalData
     ? [
         {
@@ -187,6 +179,60 @@ const Layout = () => {
     };
   }, []);
 
+  const operatorState = useContext(OperatorContext);
+  const location = useLocation();
+
+  const discoverNavItems: React.ComponentProps<typeof EuiSideNav>["items"] =
+    operatorState.enabled && operatorState.canList
+      ? [
+          {
+            name: "Discover Features",
+            id: htmlIdGenerator("discover")(),
+            icon: <EuiIcon type="compass" />,
+            renderItem: (props: any) => <Link {...props} to="/discover" />,
+            isSelected: location.pathname === "/discover",
+          },
+        ]
+      : [];
+
+  const adminNavItems: React.ComponentProps<typeof EuiSideNav>["items"] =
+    operatorState.enabled
+      ? [
+          {
+            name: "Administration",
+            id: htmlIdGenerator("admin")(),
+            items: [
+              ...(operatorState.canList
+                ? [
+                    {
+                      name: "Manage Feature Stores",
+                      id: htmlIdGenerator("manage")(),
+                      icon: <EuiIcon type="managementApp" />,
+                      renderItem: (props: any) => (
+                        <Link {...props} to="/manage" />
+                      ),
+                      isSelected: location.pathname === "/manage",
+                    },
+                  ]
+                : []),
+              ...(operatorState.canCreate
+                ? [
+                    {
+                      name: "Create Feature Store",
+                      id: htmlIdGenerator("create")(),
+                      icon: <EuiIcon type="plusInCircle" />,
+                      renderItem: (props: any) => (
+                        <Link {...props} to="/create" />
+                      ),
+                      isSelected: location.pathname === "/create",
+                    },
+                  ]
+                : []),
+            ],
+          },
+        ]
+      : [];
+
   return (
     <RegistryPathContext.Provider value={registryPath}>
       <GlobalSearchShortcut onOpen={handleSearchOpen} />
@@ -205,23 +251,41 @@ const Layout = () => {
           <FeastWordMark />
           <EuiSpacer size="s" />
           <ProjectSelector />
+          {discoverNavItems.length > 0 && (
+            <React.Fragment>
+              <EuiSpacer size="s" />
+              <EuiSideNav
+                aria-label="Discovery"
+                items={discoverNavItems}
+              />
+            </React.Fragment>
+          )}
           {registryPath && (
             <React.Fragment>
               <EuiHorizontalRule margin="s" />
               <Sidebar />
-              <EuiSpacer size="l" />
-              <EuiHorizontalRule margin="s" />
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-start",
-                  alignItems: "center",
-                }}
-              >
-                <ThemeToggle />
-              </div>
             </React.Fragment>
           )}
+          {adminNavItems.length > 0 && (
+            <React.Fragment>
+              <EuiHorizontalRule margin="s" />
+              <EuiSideNav
+                aria-label="Administration"
+                items={adminNavItems}
+              />
+            </React.Fragment>
+          )}
+          <EuiSpacer size="l" />
+          <EuiHorizontalRule margin="s" />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-start",
+              alignItems: "center",
+            }}
+          >
+            <ThemeToggle />
+          </div>
         </EuiPageSidebar>
 
         <EuiPageBody>
