@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 from fastapi import FastAPI
 
+from feast.api.iceberg import register_iceberg_routes
 from feast.api.registry.rest.compute_engines import get_compute_engine_router
 from feast.api.registry.rest.data_sources import get_data_source_router
 from feast.api.registry.rest.entities import get_entity_router
@@ -43,6 +44,12 @@ def register_all_routes(app: FastAPI, grpc_handler, server=None, store=None):
     app.include_router(get_saved_dataset_router(grpc_handler))
     app.include_router(get_monitoring_router(grpc_handler, store=resolved_store))
     app.include_router(get_compute_engine_router(grpc_handler, store=resolved_store))
+
+    register_iceberg_routes(app, grpc_handler)
+    logger.info(
+        "Iceberg REST Catalog API registered on /v1/* "
+        "(namespaces, tables, volumes, connections)"
+    )
 
     _register_openlineage_consumer(app, resolved_store)
 
