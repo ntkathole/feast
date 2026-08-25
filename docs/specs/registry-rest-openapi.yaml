@@ -1,0 +1,5035 @@
+openapi: 3.1.0
+info:
+  title: Feast REST Registry Server
+  description: Feast REST Registry Server
+  version: 1.0.0
+paths:
+  /entities:
+    get:
+      summary: List Entities
+      operationId: list_entities_entities_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each entity
+          default: false
+          title: Include Relationships
+        description: Include relationships for each entity
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Apply Entity
+      operationId: apply_entity_entities_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyEntityRequestBody'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /entities/all:
+    get:
+      summary: List All Entities
+      operationId: list_all_entities_entities_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each entity
+          default: false
+          title: Include Relationships
+        description: Include relationships for each entity
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /entities/{name}:
+    get:
+      summary: Get Entity
+      operationId: get_entity_entities__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this entity
+          default: false
+          title: Include Relationships
+        description: Include relationships for this entity
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Delete Entity
+      operationId: delete_entity_entities__name__delete
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /data_sources:
+    get:
+      summary: List Data Sources
+      operationId: list_data_sources_data_sources_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each data source
+          default: false
+          title: Include Relationships
+        description: Include relationships for each data source
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: tags
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          default: []
+          title: Tags
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Apply Data Source
+      operationId: apply_data_source_data_sources_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyDataSourceRequestBody'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /data_sources/all:
+    get:
+      summary: List Data Sources All
+      operationId: list_data_sources_all_data_sources_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each data source
+          default: false
+          title: Include Relationships
+        description: Include relationships for each data source
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /data_sources/{name}:
+    get:
+      summary: Get Data Source
+      operationId: get_data_source_data_sources__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this data source
+          default: false
+          title: Include Relationships
+        description: Include relationships for this data source
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Delete Data Source
+      operationId: delete_data_source_data_sources__name__delete
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /feature_services:
+    get:
+      summary: List Feature Services
+      operationId: list_feature_services_feature_services_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each feature service
+          default: false
+          title: Include Relationships
+        description: Include relationships for each feature service
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: feature_view
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter feature services by feature view name
+          title: Feature View
+        description: Filter feature services by feature view name
+      - name: tags
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          default: []
+          title: Tags
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Apply Feature Service
+      operationId: apply_feature_service_feature_services_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyFeatureServiceRequestBody'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /feature_services/all:
+    get:
+      summary: List Feature Services All
+      operationId: list_feature_services_all_feature_services_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each feature service
+          default: false
+          title: Include Relationships
+        description: Include relationships for each feature service
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /feature_services/{name}:
+    get:
+      summary: Get Feature Service
+      operationId: get_feature_service_feature_services__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this feature service
+          default: false
+          title: Include Relationships
+        description: Include relationships for this feature service
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Delete Feature Service
+      operationId: delete_feature_service_feature_services__name__delete
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /feature_views/all:
+    get:
+      summary: List Feature Views All
+      operationId: list_feature_views_all_feature_views_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each feature view
+          default: false
+          title: Include Relationships
+        description: Include relationships for each feature view
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /feature_views/{name}:
+    get:
+      summary: Get Any Feature View
+      operationId: get_any_feature_view_feature_views__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this feature view
+          default: false
+          title: Include Relationships
+        description: Include relationships for this feature view
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Delete Feature View
+      operationId: delete_feature_view_feature_views__name__delete
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /feature_views:
+    get:
+      summary: List All Feature Views
+      operationId: list_all_feature_views_feature_views_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each feature view
+          default: false
+          title: Include Relationships
+        description: Include relationships for each feature view
+      - name: entity
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter feature views by entity name
+          title: Entity
+        description: Filter feature views by entity name
+      - name: feature
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter feature views by feature name
+          title: Feature
+        description: Filter feature views by feature name
+      - name: feature_service
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter feature views by feature service name
+          title: Feature Service
+        description: Filter feature views by feature service name
+      - name: data_source
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter feature views by data source name
+          title: Data Source
+        description: Filter feature views by data source name
+      - name: updated_since
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Only return feature views updated at or after this ISO-8601
+            UTC timestamp (e.g. 2024-01-01T00:00:00Z)
+          title: Updated Since
+        description: Only return feature views updated at or after this ISO-8601 UTC
+          timestamp (e.g. 2024-01-01T00:00:00Z)
+      - name: tags
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          default: []
+          title: Tags
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Apply Feature View
+      operationId: apply_feature_view_feature_views_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyFeatureViewRequestBody'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /features:
+    get:
+      summary: List Features
+      operationId: list_features_features_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_view
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Feature View
+      - name: name
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Name
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each feature
+          default: false
+          title: Include Relationships
+        description: Include relationships for each feature
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: 'Allow using cached registry data (default: true)'
+          default: true
+          title: Allow Cache
+        description: 'Allow using cached registry data (default: true)'
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /features/{feature_view}/{name}:
+    get:
+      summary: Get Feature
+      operationId: get_feature_features__feature_view___name__get
+      parameters:
+      - name: feature_view
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Feature View
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this feature
+          default: false
+          title: Include Relationships
+        description: Include relationships for this feature
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /features/all:
+    get:
+      summary: List Features All
+      operationId: list_features_all_features_all_get
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each feature
+          default: false
+          title: Include Relationships
+        description: Include relationships for each feature
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: 'Allow using cached registry data (default: true)'
+          default: true
+          title: Allow Cache
+        description: 'Allow using cached registry data (default: true)'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /labels:
+    get:
+      summary: List Labels
+      operationId: list_labels_labels_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_view
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter by label view name
+          title: Feature View
+        description: Filter by label view name
+      - name: name
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Filter by label name
+          title: Name
+        description: Filter by label name
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each label
+          default: false
+          title: Include Relationships
+        description: Include relationships for each label
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /labels/all:
+    get:
+      summary: List Labels All
+      operationId: list_labels_all_labels_all_get
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each label
+          default: false
+          title: Include Relationships
+        description: Include relationships for each label
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /label_views:
+    get:
+      summary: List Label Views
+      operationId: list_label_views_label_views_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each label view
+          default: false
+          title: Include Relationships
+        description: Include relationships for each label view
+      - name: tags
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          default: []
+          title: Tags
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /label_views/all:
+    get:
+      summary: List Label Views All
+      operationId: list_label_views_all_label_views_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each label view
+          default: false
+          title: Include Relationships
+        description: Include relationships for each label view
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /label_views/{name}:
+    get:
+      summary: Get Label View
+      operationId: get_label_view_label_views__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this label view
+          default: false
+          title: Include Relationships
+        description: Include relationships for this label view
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/registry:
+    get:
+      tags:
+      - Lineage
+      summary: Get Registry Lineage
+      description: "Get complete registry lineage with relationships and indirect\
+        \ relationships.\nArgs:\n    project: Project name\n    allow_cache: Whether\
+        \ to allow cached data\n    filter_object_type: Optional filter by object\
+        \ type (dataSource, entity, featureView, featureService, feature)\n    filter_object_name:\
+        \ Optional filter by object name\nReturns:\n    Dictionary containing relationships\
+        \ and indirect_relationships arrays"
+      operationId: get_registry_lineage_lineage_registry_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: filter_object_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filter Object Type
+      - name: filter_object_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filter Object Name
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/objects/{object_type}/{object_name}:
+    get:
+      tags:
+      - Lineage
+      summary: Get Object Relationships Path
+      description: "Get relationships for a specific object.\nArgs:\n    object_type:\
+        \ Type of object (dataSource, entity, featureView, featureService, feature)\n\
+        \    object_name: Name of the object\n    project: Project name\n    include_indirect:\
+        \ Whether to include indirect relationships\n    allow_cache: Whether to allow\
+        \ cached data\nReturns:\n    Dictionary containing relationships array for\
+        \ the specific object"
+      operationId: get_object_relationships_path_lineage_objects__object_type___object_name__get
+      parameters:
+      - name: object_type
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Object Type
+      - name: object_name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Object Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_indirect
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Include Indirect
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/complete:
+    get:
+      tags:
+      - Lineage
+      summary: Get Complete Registry Data
+      description: "Get complete registry data.\nThis endpoint provides all the data\
+        \ the UI currently loads:\n- All registry objects\n- Relationships\n- Indirect\
+        \ relationships\n- Merged feature view data\n- Features\n\nArgs:\n    project:\
+        \ Project name\n    allow_cache: Whether to allow cached data\n    pagination_params:\
+        \ Pagination parameters (page, page_size)\n    sorting_params: Sorting parameters\
+        \ (sort_by, sort_order)\n\nReturns:\n    Complete registry data structure\
+        \ with pagination metadata.\n\nNote:\n    Pagination and sorting are applied\
+        \ to each object type separately."
+      operationId: get_complete_registry_data_lineage_complete_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/registry/all:
+    get:
+      tags:
+      - Lineage
+      summary: Get Registry Lineage All
+      operationId: get_registry_lineage_all_lineage_registry_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: filter_object_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filter Object Type
+      - name: filter_object_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filter Object Name
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/complete/all:
+    get:
+      tags:
+      - Lineage
+      summary: Get Complete Registry Data All
+      operationId: get_complete_registry_data_all_lineage_complete_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /permissions/{name}:
+    get:
+      summary: Get Permission
+      operationId: get_permission_permissions__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this permission
+          default: false
+          title: Include Relationships
+        description: Include relationships for this permission
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Delete Permission
+      operationId: delete_permission_permissions__name__delete
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /permissions:
+    get:
+      summary: List Permissions
+      operationId: list_permissions_permissions_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each permission
+          default: false
+          title: Include Relationships
+        description: Include relationships for each permission
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Apply Permission
+      operationId: apply_permission_permissions_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPermissionRequestBody'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /projects/{name}:
+    get:
+      summary: Get Project
+      operationId: get_project_projects__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /projects:
+    get:
+      summary: List Projects
+      operationId: list_projects_projects_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /search:
+    get:
+      summary: Search Resources
+      description: 'Search across all Feast resources including:
+
+        - Entities
+
+        - Feature Views
+
+        - Features
+
+        - Feature Services
+
+        - Data Sources
+
+        - Saved Datasets
+
+        Project Selection:
+
+        - No projects parameter: Search all projects (default)
+
+        - projects=["proj1"]: Search single project
+
+        - projects=["proj1", "proj2"]: Search multiple projects
+
+        Sorting:
+
+        - Supports sorting by match_score, name, or type
+
+        - Can specify sort_order as asc or desc'
+      operationId: search_resources_search_get
+      parameters:
+      - name: query
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Search query string
+          title: Query
+        description: Search query string
+      - name: projects
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+          - type: 'null'
+          description: Project names to search in (optional - searches all projects
+            if not specified)
+          default: []
+          title: Projects
+        description: Project names to search in (optional - searches all projects
+          if not specified)
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: tags
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          default: []
+          title: Tags
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort Order
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Search Resources Search Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /metrics/resource_counts:
+    get:
+      tags:
+      - Metrics
+      summary: Resource Counts
+      description: 'Resource counts and feature store inventory metadata.
+
+
+        Returns counts per resource type, plus enriched summaries:
+
+        feature services (names), feature views (with per-view feature
+
+        count and materialization info), project list, and the registry
+
+        last-updated timestamp.'
+      operationId: resource_counts_metrics_resource_counts_get
+      parameters:
+      - name: project
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Project name to filter resource counts
+          title: Project
+        description: Project name to filter resource counts
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /metrics/popular_tags:
+    get:
+      tags:
+      - Metrics
+      summary: Popular Tags
+      description: 'Discover Feature Views by popular tags. Returns the most popular
+        tags
+
+        (tags assigned to maximum number of feature views) with their associated feature
+        views.
+
+        If no project is specified, returns popular tags across all projects.'
+      operationId: popular_tags_metrics_popular_tags_get
+      parameters:
+      - name: project
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Project name for popular tags (optional, returns all projects
+            if not specified)
+          title: Project
+        description: Project name for popular tags (optional, returns all projects
+          if not specified)
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          description: Number of popular tags to return
+          default: 4
+          title: Limit
+        description: Number of popular tags to return
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopularTagsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /metrics/recently_visited:
+    get:
+      tags:
+      - Metrics
+      summary: Recently Visited
+      operationId: recently_visited_metrics_recently_visited_get
+      parameters:
+      - name: project
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Project name to filter recent visits
+          title: Project
+        description: Project name to filter recent visits
+      - name: object
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Object type to filter recent visits (e.g., entities, features)
+          title: Object
+        description: Object type to filter recent visits (e.g., entities, features)
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets/all:
+    get:
+      summary: List Saved Datasets All
+      operationId: list_saved_datasets_all_saved_datasets_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          default: asc
+          title: Sort Order
+      - name: namespace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by namespace (logical grouping)
+          title: Namespace
+        description: Filter by namespace (logical grouping)
+      - name: collection
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by collection (sub-grouping within namespace)
+          title: Collection
+        description: Filter by collection (sub-grouping within namespace)
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each saved dataset
+          default: false
+          title: Include Relationships
+        description: Include relationships for each saved dataset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets/data/{name}:
+    get:
+      summary: Get Dataset Data
+      operationId: get_dataset_data_saved_datasets_data__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 10
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets/jobs/{job_id}:
+    get:
+      summary: Get Dataset Job Status
+      operationId: get_dataset_job_status_saved_datasets_jobs__job_id__get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets/jobs:
+    get:
+      summary: List Dataset Jobs
+      operationId: list_dataset_jobs_saved_datasets_jobs_get
+      parameters:
+      - name: project
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Project
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets/{name}:
+    get:
+      summary: Get Saved Dataset
+      operationId: get_saved_dataset_saved_datasets__name__get
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for this saved dataset
+          default: false
+          title: Include Relationships
+        description: Include relationships for this saved dataset
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Delete Saved Dataset
+      operationId: delete_saved_dataset_saved_datasets__name__delete
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets:
+    get:
+      summary: List Saved Datasets
+      operationId: list_saved_datasets_saved_datasets_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: namespace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by namespace (logical grouping)
+          title: Namespace
+        description: Filter by namespace (logical grouping)
+      - name: collection
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by collection (sub-grouping within namespace)
+          title: Collection
+        description: Filter by collection (sub-grouping within namespace)
+      - name: include_relationships
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Include relationships for each saved dataset
+          default: false
+          title: Include Relationships
+        description: Include relationships for each saved dataset
+      - name: tags
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          default: []
+          title: Tags
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Register Saved Dataset
+      operationId: register_saved_dataset_saved_datasets_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDatasetRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /saved_datasets/create:
+    post:
+      summary: Create Dataset
+      operationId: create_dataset_saved_datasets_create_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDatasetRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/compute:
+    post:
+      tags:
+      - Monitoring
+      summary: Compute Metrics
+      description: 'Submit a DQM job to compute and store metrics. Returns job_id.
+
+
+        When set_baseline is True and no date range is provided, computes
+
+        baseline from all available source data.'
+      operationId: compute_metrics_monitoring_compute_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputeMetricsRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/auto_compute:
+    post:
+      tags:
+      - Monitoring
+      summary: Auto Compute
+      description: Auto-detect date ranges and compute all granularities.
+      operationId: auto_compute_monitoring_auto_compute_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoComputeRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/compute/log:
+    post:
+      tags:
+      - Monitoring
+      summary: Compute Log Metrics
+      description: Compute metrics from feature serving logs for a feature service.
+      operationId: compute_log_metrics_monitoring_compute_log_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputeLogMetricsRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/auto_compute/log:
+    post:
+      tags:
+      - Monitoring
+      summary: Auto Compute Log
+      description: Auto-detect date ranges from log data and compute all granularities.
+      operationId: auto_compute_log_monitoring_auto_compute_log_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoComputeLogRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/jobs/{job_id}:
+    get:
+      tags:
+      - Monitoring
+      summary: Get Job Status
+      operationId: get_job_status_monitoring_jobs__job_id__get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/compute/transient:
+    post:
+      tags:
+      - Monitoring
+      summary: Compute Transient
+      description: 'Compute metrics on-the-fly for an arbitrary date range. Results
+        are
+
+        returned directly and NOT persisted to the monitoring tables.'
+      operationId: compute_transient_monitoring_compute_transient_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputeTransientRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/metrics/features:
+    get:
+      tags:
+      - Monitoring
+      summary: Get Feature Metrics
+      operationId: get_feature_metrics_monitoring_metrics_features_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_view_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature View Name
+      - name: feature_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Name
+      - name: feature_service_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Granularity
+      - name: data_source_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source Type
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/metrics/feature_views:
+    get:
+      tags:
+      - Monitoring
+      summary: Get Feature View Metrics
+      operationId: get_feature_view_metrics_monitoring_metrics_feature_views_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_view_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature View Name
+      - name: feature_service_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Granularity
+      - name: data_source_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source Type
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/metrics/feature_services:
+    get:
+      tags:
+      - Monitoring
+      summary: Get Feature Service Metrics
+      operationId: get_feature_service_metrics_monitoring_metrics_feature_services_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_service_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Granularity
+      - name: data_source_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source Type
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/metrics/baseline:
+    get:
+      tags:
+      - Monitoring
+      summary: Get Baseline
+      operationId: get_baseline_monitoring_metrics_baseline_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_view_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature View Name
+      - name: feature_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Name
+      - name: data_source_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source Type
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /monitoring/metrics/timeseries:
+    get:
+      tags:
+      - Monitoring
+      summary: Get Timeseries
+      operationId: get_timeseries_monitoring_metrics_timeseries_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: feature_view_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature View Name
+      - name: feature_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Name
+      - name: feature_service_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Granularity
+      - name: data_source_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source Type
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /compute_engines:
+    get:
+      summary: Get Compute Engine
+      operationId: get_compute_engine_compute_engines_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /compute_engines/all:
+    get:
+      summary: List All Compute Engines
+      operationId: list_all_compute_engines_compute_engines_all_get
+      parameters:
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /materialization_jobs:
+    get:
+      summary: List Materialization Jobs
+      operationId: list_materialization_jobs_materialization_jobs_get
+      parameters:
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Project
+      - name: allow_cache
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Allow Cache
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by status
+          title: Status
+        description: Filter by status
+      - name: feature_view
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by feature view name
+          title: Feature View
+        description: Filter by feature view name
+      - name: page
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 1
+          - type: 'null'
+          title: Limit
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(asc|desc)$
+          - type: 'null'
+          title: Sort Order
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /registry/refresh:
+    post:
+      summary: Refresh Registry
+      operationId: refresh_registry_registry_refresh_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /lineage:
+    post:
+      tags:
+      - OpenLineage
+      summary: Receive Lineage Event
+      description: "Receive an OpenLineage event.\n\nCompatible with the standard\
+        \ OpenLineage API endpoint.\nAccepts RunEvent, DatasetEvent, or JobEvent.\n\
+        \nThe router defines POST /lineage; the full path depends on\nthe server mount:\n\
+        - UI server (mounted at /api/v1):  POST /api/v1/lineage\n- REST server (root_path=/api/v1):\
+        \ POST /lineage\n  When behind a reverse proxy, the proxy strips /api/v1,\n\
+        \  so external clients use POST /api/v1/lineage in both cases."
+      operationId: receive_lineage_event_lineage_post
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/batch:
+    post:
+      tags:
+      - OpenLineage
+      summary: Receive Lineage Batch
+      description: Receive a batch of OpenLineage events.
+      operationId: receive_lineage_batch_lineage_batch_post
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/reset:
+    delete:
+      tags:
+      - OpenLineage
+      summary: Reset Lineage
+      description: 'Purge OpenLineage data. Requires API key.
+
+
+        If ?namespace=X is provided, only that namespace''s data is deleted.
+
+        Otherwise, all OpenLineage data is purged.'
+      operationId: reset_lineage_lineage_openlineage_reset_delete
+      parameters:
+      - name: namespace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/events:
+    get:
+      tags:
+      - OpenLineage
+      summary: List Events
+      description: List stored OpenLineage events with optional filtering.
+      operationId: list_events_lineage_openlineage_events_get
+      parameters:
+      - name: namespace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+      - name: job_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Job Name
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/jobs:
+    get:
+      tags:
+      - OpenLineage
+      summary: List Jobs
+      description: List all jobs from all OpenLineage producers.
+      operationId: list_jobs_lineage_openlineage_jobs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /lineage/openlineage/datasets:
+    get:
+      tags:
+      - OpenLineage
+      summary: List Datasets
+      description: List all datasets from OpenLineage events.
+      operationId: list_datasets_lineage_openlineage_datasets_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /lineage/openlineage/graph/{node_type}/{namespace}/{name}:
+    get:
+      tags:
+      - OpenLineage
+      summary: Get Lineage Graph
+      description: 'Get the lineage graph for a specific node.
+
+
+        Traverses upstream and/or downstream from the given node
+
+        up to the specified depth.'
+      operationId: get_lineage_graph_lineage_openlineage_graph__node_type___namespace___name__get
+      parameters:
+      - name: node_type
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Node Type
+      - name: namespace
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Namespace
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Name
+      - name: depth
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 10
+          title: Depth
+      - name: direction
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(both|upstream|downstream)$
+          default: both
+          title: Direction
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/namespaces:
+    get:
+      tags:
+      - OpenLineage
+      summary: List Namespaces
+      description: List all distinct namespaces known to the lineage store.
+      operationId: list_namespaces_lineage_openlineage_namespaces_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /lineage/openlineage/graph:
+    get:
+      tags:
+      - OpenLineage
+      summary: Get Full Lineage Graph
+      description: 'Get all lineage nodes and edges (RBAC-filtered by namespace).
+
+
+        Optional query params:
+
+        - namespace: filter to a single namespace
+
+        - limit/offset: paginate nodes (0 = no limit)
+
+
+        Includes symlink edges that connect datasets across producers
+
+        when they reference the same physical data (via SymlinksDatasetFacet
+
+        or matching dataSource URIs).'
+      operationId: get_full_lineage_graph_lineage_openlineage_graph_get
+      parameters:
+      - name: namespace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10000
+          minimum: 0
+          default: 0
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/runs:
+    get:
+      tags:
+      - OpenLineage
+      summary: List Runs
+      description: List runs, optionally filtered by job namespace and name.
+      operationId: list_runs_lineage_openlineage_runs_get
+      parameters:
+      - name: job_namespace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Job Namespace
+      - name: job_name
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Job Name
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/runs/{run_id}:
+    get:
+      tags:
+      - OpenLineage
+      summary: Get Run Detail
+      description: Get a single run with its input and output datasets.
+      operationId: get_run_detail_lineage_openlineage_runs__run_id__get
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /lineage/openlineage/retention:
+    get:
+      tags:
+      - OpenLineage
+      summary: Get Retention Status
+      description: Return retention configuration and current storage stats.
+      operationId: get_retention_status_lineage_openlineage_retention_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /lineage/openlineage/retention/prune:
+    post:
+      tags:
+      - OpenLineage
+      summary: Trigger Prune
+      description: Manually trigger retention pruning.
+      operationId: trigger_prune_lineage_openlineage_retention_prune_post
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    ApplyDataSourceRequestBody:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        type:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Type
+        timestamp_field:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timestamp Field
+          default: ''
+        created_timestamp_column:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created Timestamp Column
+          default: ''
+        date_partition_column:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date Partition Column
+          default: ''
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        tags:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Tags
+          default: {}
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+          default: ''
+        file_options:
+          anyOf:
+          - $ref: '#/components/schemas/FileOptionsModel'
+          - type: 'null'
+        bigquery_options:
+          anyOf:
+          - $ref: '#/components/schemas/BigQueryOptionsModel'
+          - type: 'null'
+        snowflake_options:
+          anyOf:
+          - $ref: '#/components/schemas/SnowflakeOptionsModel'
+          - type: 'null'
+        redshift_options:
+          anyOf:
+          - $ref: '#/components/schemas/RedshiftOptionsModel'
+          - type: 'null'
+        kafka_options:
+          anyOf:
+          - $ref: '#/components/schemas/KafkaOptionsModel'
+          - type: 'null'
+        spark_options:
+          anyOf:
+          - $ref: '#/components/schemas/SparkOptionsModel'
+          - type: 'null'
+        trino_options:
+          anyOf:
+          - $ref: '#/components/schemas/TrinoOptionsModel'
+          - type: 'null'
+        athena_options:
+          anyOf:
+          - $ref: '#/components/schemas/AthenaOptionsModel'
+          - type: 'null'
+        kinesis_options:
+          anyOf:
+          - $ref: '#/components/schemas/KinesisOptionsModel'
+          - type: 'null'
+        custom_options:
+          anyOf:
+          - $ref: '#/components/schemas/CustomOptionsModel'
+          - type: 'null'
+        data_source_class_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source Class Type
+      type: object
+      required:
+      - name
+      - project
+      title: ApplyDataSourceRequestBody
+    ApplyEntityRequestBody:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        join_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Join Key
+        value_type:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Value Type
+          default: 2
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        tags:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Tags
+          default: {}
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+          default: ''
+      type: object
+      required:
+      - name
+      - project
+      title: ApplyEntityRequestBody
+    ApplyFeatureServiceRequestBody:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        features:
+          items:
+            $ref: '#/components/schemas/FeatureViewRefModel'
+          type: array
+          title: Features
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        tags:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Tags
+          default: {}
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+          default: ''
+      type: object
+      required:
+      - name
+      - project
+      - features
+      title: ApplyFeatureServiceRequestBody
+    ApplyFeatureViewRequestBody:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        entities:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Entities
+          default: []
+        features:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/FeatureModel'
+            type: array
+          - type: 'null'
+          title: Features
+          default: []
+        batch_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Batch Source
+          default: ''
+        ttl_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Ttl Seconds
+        online:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Online
+          default: true
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+        tags:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Tags
+          default: {}
+        owner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner
+          default: ''
+      type: object
+      required:
+      - name
+      - project
+      title: ApplyFeatureViewRequestBody
+    ApplyPermissionRequestBody:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        types:
+          items:
+            type: string
+          type: array
+          title: Types
+          default: []
+        name_patterns:
+          items:
+            type: string
+          type: array
+          title: Name Patterns
+          default: []
+        actions:
+          items:
+            type: string
+          type: array
+          title: Actions
+          default: []
+        policy:
+          $ref: '#/components/schemas/PolicyModel'
+        tags:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Tags
+          default: {}
+        required_tags:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Required Tags
+          default: {}
+      type: object
+      required:
+      - name
+      - project
+      - policy
+      title: ApplyPermissionRequestBody
+    AthenaOptionsModel:
+      properties:
+        table:
+          type: string
+          title: Table
+          default: ''
+        query:
+          type: string
+          title: Query
+          default: ''
+        database:
+          type: string
+          title: Database
+          default: ''
+        data_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Data Source
+          default: ''
+      type: object
+      title: AthenaOptionsModel
+    AutoComputeLogRequest:
+      properties:
+        project:
+          type: string
+          title: Project
+        feature_service_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+      type: object
+      required:
+      - project
+      title: AutoComputeLogRequest
+    AutoComputeRequest:
+      properties:
+        project:
+          type: string
+          title: Project
+        feature_view_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature View Name
+      type: object
+      required:
+      - project
+      title: AutoComputeRequest
+    BigQueryOptionsModel:
+      properties:
+        table:
+          type: string
+          title: Table
+          default: ''
+        query:
+          type: string
+          title: Query
+          default: ''
+      type: object
+      title: BigQueryOptionsModel
+    CombinedGroupNamespacePolicyModel:
+      properties:
+        groups:
+          items:
+            type: string
+          type: array
+          title: Groups
+        namespaces:
+          items:
+            type: string
+          type: array
+          title: Namespaces
+      type: object
+      required:
+      - groups
+      - namespaces
+      title: CombinedGroupNamespacePolicyModel
+    ComputeLogMetricsRequest:
+      properties:
+        project:
+          type: string
+          title: Project
+        feature_service_name:
+          type: string
+          title: Feature Service Name
+        start_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+        end_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+        granularity:
+          type: string
+          title: Granularity
+          default: daily
+        set_baseline:
+          type: boolean
+          title: Set Baseline
+          default: false
+      type: object
+      required:
+      - project
+      - feature_service_name
+      title: ComputeLogMetricsRequest
+    ComputeMetricsRequest:
+      properties:
+        project:
+          type: string
+          title: Project
+        feature_view_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature View Name
+        feature_names:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Feature Names
+        start_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+        end_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+        granularity:
+          type: string
+          title: Granularity
+          default: daily
+        set_baseline:
+          type: boolean
+          title: Set Baseline
+          default: false
+      type: object
+      required:
+      - project
+      title: ComputeMetricsRequest
+    ComputeTransientRequest:
+      properties:
+        project:
+          type: string
+          title: Project
+        feature_view_name:
+          type: string
+          title: Feature View Name
+        feature_names:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Feature Names
+        start_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+        end_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+      type: object
+      required:
+      - project
+      - feature_view_name
+      title: ComputeTransientRequest
+    CreateDatasetRequest:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        feature_service_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+        features:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Features
+        entity_source_type:
+          type: string
+          title: Entity Source Type
+          default: inline
+        entity_source_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity Source Path
+        entity_keys:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Entity Keys
+        entity_values:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity Values
+        start_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Start Date
+        end_date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End Date
+        extra_columns:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Extra Columns
+        storage_type:
+          type: string
+          title: Storage Type
+          default: file
+        storage_path:
+          type: string
+          title: Storage Path
+          default: ''
+        storage_file_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Storage File Format
+          default: parquet
+        tags:
+          additionalProperties:
+            type: string
+          type: object
+          title: Tags
+          default: {}
+        allow_overwrite:
+          type: boolean
+          title: Allow Overwrite
+          default: false
+      type: object
+      required:
+      - name
+      - project
+      title: CreateDatasetRequest
+    CustomOptionsModel:
+      properties:
+        configuration:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Configuration
+          default: ''
+        class_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Class Name
+          default: ''
+        config:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Config
+          default: ''
+      type: object
+      title: CustomOptionsModel
+    FeatureModel:
+      properties:
+        name:
+          type: string
+          title: Name
+        value_type:
+          type: integer
+          title: Value Type
+          default: 2
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          default: ''
+      type: object
+      required:
+      - name
+      title: FeatureModel
+    FeatureViewInfo:
+      properties:
+        name:
+          type: string
+          title: Name
+          description: Name of the feature view
+        project:
+          type: string
+          title: Project
+          description: Project name of the feature view
+      type: object
+      required:
+      - name
+      - project
+      title: FeatureViewInfo
+      description: Feature view information in popular tags response.
+    FeatureViewRefModel:
+      properties:
+        feature_view_name:
+          type: string
+          title: Feature View Name
+        feature_names:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Feature Names
+          default: []
+      type: object
+      required:
+      - feature_view_name
+      title: FeatureViewRefModel
+    FileOptionsModel:
+      properties:
+        uri:
+          type: string
+          title: Uri
+          default: ''
+        file_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File Format
+          default: parquet
+        s3_endpoint_override:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: S3 Endpoint Override
+          default: ''
+      type: object
+      title: FileOptionsModel
+    GroupBasedPolicyModel:
+      properties:
+        groups:
+          items:
+            type: string
+          type: array
+          title: Groups
+      type: object
+      required:
+      - groups
+      title: GroupBasedPolicyModel
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    KafkaOptionsModel:
+      properties:
+        kafka_bootstrap_servers:
+          type: string
+          title: Kafka Bootstrap Servers
+          default: ''
+        topic:
+          type: string
+          title: Topic
+          default: ''
+        message_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message Format
+          default: json
+        watermark_delay_threshold:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Watermark Delay Threshold
+          default: ''
+      type: object
+      title: KafkaOptionsModel
+    KinesisOptionsModel:
+      properties:
+        region:
+          type: string
+          title: Region
+          default: ''
+        stream_name:
+          type: string
+          title: Stream Name
+          default: ''
+        record_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Record Format
+          default: json
+      type: object
+      title: KinesisOptionsModel
+    NamespaceBasedPolicyModel:
+      properties:
+        namespaces:
+          items:
+            type: string
+          type: array
+          title: Namespaces
+      type: object
+      required:
+      - namespaces
+      title: NamespaceBasedPolicyModel
+    PolicyModel:
+      properties:
+        role_based_policy:
+          anyOf:
+          - $ref: '#/components/schemas/RoleBasedPolicyModel'
+          - type: 'null'
+        group_based_policy:
+          anyOf:
+          - $ref: '#/components/schemas/GroupBasedPolicyModel'
+          - type: 'null'
+        namespace_based_policy:
+          anyOf:
+          - $ref: '#/components/schemas/NamespaceBasedPolicyModel'
+          - type: 'null'
+        combined_group_namespace_policy:
+          anyOf:
+          - $ref: '#/components/schemas/CombinedGroupNamespacePolicyModel'
+          - type: 'null'
+      type: object
+      title: PolicyModel
+    PopularTagInfo:
+      properties:
+        tag_key:
+          type: string
+          title: Tag Key
+          description: Tag key
+        tag_value:
+          type: string
+          title: Tag Value
+          description: Tag value
+        feature_views:
+          items:
+            $ref: '#/components/schemas/FeatureViewInfo'
+          type: array
+          title: Feature Views
+          description: List of feature views with this tag
+        total_feature_views:
+          type: integer
+          title: Total Feature Views
+          description: Total number of feature views with this tag
+      type: object
+      required:
+      - tag_key
+      - tag_value
+      - feature_views
+      - total_feature_views
+      title: PopularTagInfo
+      description: Popular tag information with associated feature views.
+    PopularTagsMetadata:
+      properties:
+        totalFeatureViews:
+          type: integer
+          title: Totalfeatureviews
+          description: Total number of feature views processed
+        totalTags:
+          type: integer
+          title: Totaltags
+          description: Total number of unique tags found
+        limit:
+          type: integer
+          title: Limit
+          description: Number of popular tags requested
+      type: object
+      required:
+      - totalFeatureViews
+      - totalTags
+      - limit
+      title: PopularTagsMetadata
+      description: Metadata for popular tags response.
+    PopularTagsResponse:
+      properties:
+        popular_tags:
+          items:
+            $ref: '#/components/schemas/PopularTagInfo'
+          type: array
+          title: Popular Tags
+          description: List of popular tags with their associated feature views
+        metadata:
+          $ref: '#/components/schemas/PopularTagsMetadata'
+          description: Metadata about the response
+      type: object
+      required:
+      - popular_tags
+      - metadata
+      title: PopularTagsResponse
+      description: Response model for popular tags endpoint.
+    RedshiftOptionsModel:
+      properties:
+        table:
+          type: string
+          title: Table
+          default: ''
+        database:
+          type: string
+          title: Database
+          default: ''
+        schema_:
+          type: string
+          title: Schema
+          default: ''
+        query:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Query
+          default: ''
+      type: object
+      title: RedshiftOptionsModel
+    RegisterDatasetRequest:
+      properties:
+        name:
+          type: string
+          title: Name
+        project:
+          type: string
+          title: Project
+        features:
+          items:
+            type: string
+          type: array
+          title: Features
+          default: []
+        join_keys:
+          items:
+            type: string
+          type: array
+          title: Join Keys
+          default: []
+        storage_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Storage Path
+        storage_type:
+          type: string
+          title: Storage Type
+          default: file
+        storage_file_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Storage File Format
+          default: parquet
+        tags:
+          additionalProperties:
+            type: string
+          type: object
+          title: Tags
+          default: {}
+        full_feature_names:
+          type: boolean
+          title: Full Feature Names
+          default: false
+        feature_service_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Feature Service Name
+        allow_override:
+          type: boolean
+          title: Allow Override
+          default: false
+        namespace:
+          type: string
+          title: Namespace
+          default: ''
+        collection:
+          type: string
+          title: Collection
+          default: ''
+        description:
+          type: string
+          title: Description
+          default: ''
+      type: object
+      required:
+      - name
+      - project
+      title: RegisterDatasetRequest
+    RoleBasedPolicyModel:
+      properties:
+        roles:
+          items:
+            type: string
+          type: array
+          title: Roles
+      type: object
+      required:
+      - roles
+      title: RoleBasedPolicyModel
+    SnowflakeOptionsModel:
+      properties:
+        table:
+          type: string
+          title: Table
+          default: ''
+        database:
+          type: string
+          title: Database
+          default: ''
+        schema_:
+          type: string
+          title: Schema
+          default: ''
+        query:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Query
+          default: ''
+        warehouse:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Warehouse
+          default: ''
+      type: object
+      title: SnowflakeOptionsModel
+    SparkOptionsModel:
+      properties:
+        table:
+          type: string
+          title: Table
+          default: ''
+        path:
+          type: string
+          title: Path
+          default: ''
+        query:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Query
+          default: ''
+        file_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File Format
+          default: ''
+        table_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table Format
+          default: ''
+        table_format_catalog:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table Format Catalog
+          default: ''
+        table_format_namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table Format Namespace
+          default: ''
+        table_format_properties:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table Format Properties
+          default: ''
+        date_partition_column:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date Partition Column
+          default: ''
+        date_partition_column_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date Partition Column Format
+          default: ''
+      type: object
+      title: SparkOptionsModel
+    TrinoOptionsModel:
+      properties:
+        table:
+          type: string
+          title: Table
+          default: ''
+        query:
+          type: string
+          title: Query
+          default: ''
+      type: object
+      title: TrinoOptionsModel
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+- BearerAuth: []
