@@ -770,9 +770,7 @@ def get_app(
 
                 now = time.time()
                 cutoff = now - 60
-                message_timestamps = [
-                    ts for ts in message_timestamps if ts >= cutoff
-                ]
+                message_timestamps = [ts for ts in message_timestamps if ts >= cutoff]
                 if len(message_timestamps) >= MAX_MESSAGES_PER_MINUTE:
                     await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                     return
