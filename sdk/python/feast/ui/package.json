@@ -61,6 +61,7 @@
     "node-forge": "1.4.0",
     "compression": "1.8.2",
     "webpack-dev-middleware": "5.3.4",
+    "source-map-js": "1.2.2",
     "@types/jest": "27.5.2",
     "expect": "27.5.1"
   }

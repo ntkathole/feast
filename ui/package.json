@@ -151,7 +151,8 @@
     "compression": "1.8.2",
     "linkify-it": "5.0.2",
     "baseline-browser-mapping": "2.11.27",
-    "webpack-dev-middleware": "5.3.4"
+    "webpack-dev-middleware": "5.3.4",
+    "source-map-js": "1.2.2"
   },
   "description": "Web UI for the [Feast Feature Store](https://feast.dev/)",
   "repository": {
