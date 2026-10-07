@@ -201,7 +201,10 @@ RAY_REQUIRED = [
 CI_REQUIRED = (
     [
         "build",
-        "virtualenv==20.23.0",
+        "virtualenv==21.14.5",
+        "jupyter-server>=2.21.0",
+        "jupyterlab>=4.6.4",
+        "tornado>=6.5.9",
         "cryptography>=46.0.7,<47",
         "ruff>=0.8.0",
         "mypy-protobuf>=3.1",
@@ -241,7 +244,6 @@ CI_REQUIRED = (
         "types-requests<2.31.0",
         "types-setuptools",
         "types-tabulate",
-        "virtualenv<20.24.2",
     ]
     + GCP_REQUIRED
     + REDIS_REQUIRED

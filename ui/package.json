@@ -144,7 +144,13 @@
     "nanoid": "3.3.18",
     "browserslist": "4.28.7",
     "source-map-js": "1.2.2",
-    "brace-expansion": "1.1.18"
+    "brace-expansion": "1.1.18",
+    "js-yaml": "5.4.3",
+    "fast-uri": "3.1.7",
+    "qs": "6.16.0",
+    "node-forge": "1.4.0",
+    "compression": "1.8.2",
+    "webpack-dev-middleware": "5.3.4"
   },
   "description": "Web UI for the [Feast Feature Store](https://feast.dev/)",
   "repository": {
