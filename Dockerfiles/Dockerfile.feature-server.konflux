@@ -3,8 +3,10 @@ FROM registry.access.redhat.com/ubi9/python-312:1@sha256:d3a5322122fd7efd5d5a248
 
 USER 0
 
-# Upgrade base packages for consistency across all arches
-RUN dnf upgrade -y --refresh && dnf clean all
+# Upgrade base packages for consistency across all arches.
+# --allowerasing resolves nodejs/npm module skew in ubi9/python-312
+# (nodejs and npm must move together across module builds).
+RUN dnf upgrade -y --refresh --allowerasing && dnf clean all
 
 # Copy Power prebuild script
 COPY sdk/python/requirements/py3.12-minimal-requirements.txt /tmp/requirements.txt

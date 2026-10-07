@@ -3,20 +3,21 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Navigation from '../../components/Navigation.astro';
 
 export async function getStaticPaths() {
-  const posts = await Astro.glob('../../../docs/blog/*.md');
-  
-  return posts.map(post => ({
-    params: {
-      slug: post.file.split('/').pop().replace('.md', '')
-    },
-    props: {
-      post
-    }
-  }));
+  const modules = import.meta.glob('../../../docs/blog/*.md', { eager: true });
+  return Object.entries(modules).map(([file, mod]) => {
+    const post = { ...mod, file };
+    return {
+      params: {
+        slug: file.split('/').pop().replace('.md', '')
+      },
+      props: { post }
+    };
+  });
 }
 
 const { post } = Astro.props;
 const { title, description, date, authors = [] } = post.frontmatter;
+const Content = post.Content;
 ---
 
 <BaseLayout title={title} description={description}>
@@ -49,7 +50,7 @@ const { title, description, date, authors = [] } = post.frontmatter;
     <div class="blog-container">
       <article class="blog-article">
         <div class="blog-content">
-          <post.Content />
+          <Content />
         </div>
       </article>
     </div>
