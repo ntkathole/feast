@@ -44,11 +44,12 @@ dependencies = [
     "psutil",
     "bigtree>=0.19.2",
     "pyasn1>=0.6.4",
-    "pyjwt",
+    "pyjwt>=2.13.0",
+    "aiohttp>=3.14.3",
 ]
 
 [project.optional-dependencies]
-aws = ["boto3==1.38.27", "fsspec<=2024.9.0", "aiobotocore>2,<3"]
+aws = ["boto3==1.38.27", "fsspec>=2026.6.0", "aiobotocore>2,<3"]
 azure = [
     "azure-storage-blob>=0.37.0",
     "azure-identity>=1.6.1",
@@ -72,7 +73,7 @@ gcp = [
     "google-cloud-datastore>=2.16.0,<3",
     "google-cloud-storage>=1.34.0,<3",
     "google-cloud-bigtable>=2.11.0,<3",
-    "fsspec<=2024.9.0",
+    "fsspec>=2026.6.0",
 ]
 ge = ["great_expectations>=0.15.41,<1"]
 go = ["cffi>=1.15.0"]
@@ -130,7 +131,7 @@ redis = [
 ]
 singlestore = ["singlestoredb<1.8.0"]
 snowflake = [
-    "snowflake-connector-python[pandas]>=3.7,<5",
+    "snowflake-connector-python[pandas]>=4.7.3,<5",
 ]
 sqlite_vec = ["sqlite-vec==v0.1.6"]
 mcp = ["fastapi_mcp"]
