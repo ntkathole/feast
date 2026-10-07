@@ -436,9 +436,7 @@ def get_app(
                     actions=[AuthzedAction.WRITE_ONLINE],
                 )
         else:
-            feature_views_to_materialize = (
-                store._get_feature_views_to_materialize(None)
-            )
+            feature_views_to_materialize = store._get_feature_views_to_materialize(None)
             for fv in feature_views_to_materialize:
                 assert_permissions(
                     resource=fv,
@@ -447,9 +445,7 @@ def get_app(
 
         if request.disable_event_timestamp:
             now = datetime.now()
-            start_date = datetime(
-                1970, 1, 1
-            )
+            start_date = datetime(1970, 1, 1)
             end_date = now
         else:
             if not request.start_ts or not request.end_ts:
@@ -475,9 +471,7 @@ def get_app(
                     actions=[AuthzedAction.WRITE_ONLINE],
                 )
         else:
-            feature_views_to_materialize = (
-                store._get_feature_views_to_materialize(None)
-            )
+            feature_views_to_materialize = store._get_feature_views_to_materialize(None)
             for fv in feature_views_to_materialize:
                 assert_permissions(
                     resource=fv,
