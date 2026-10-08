@@ -150,7 +150,8 @@
     "qs": "6.16.0",
     "node-forge": "1.4.0",
     "compression": "1.8.2",
-    "webpack-dev-middleware": "5.3.4"
+    "webpack-dev-middleware": "5.3.4",
+    "proxy-addr": "2.0.8"
   },
   "description": "Web UI for the [Feast Feature Store](https://feast.dev/)",
   "repository": {
