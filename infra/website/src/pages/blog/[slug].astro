@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Navigation from '../../components/Navigation.astro';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const SITE_URL = 'https://feast.dev';
 
@@ -22,20 +23,22 @@ function extractHeroImage(markdown: string): string | undefined {
 }
 
 export async function getStaticPaths() {
-  const posts = await Astro.glob('../../../docs/blog/*.md');
-  
-  return posts.map(post => ({
-    params: {
-      slug: post.file.split('/').pop().replace('.md', '')
-    },
-    props: {
-      post
-    }
-  }));
+  const modules = import.meta.glob('../../../docs/blog/*.md', { eager: true });
+  return Object.entries(modules).map(([file, mod]) => {
+    const absFile = fileURLToPath(new URL(file, import.meta.url));
+    const post = { ...mod, file: absFile };
+    return {
+      params: {
+        slug: file.split('/').pop().replace('.md', '')
+      },
+      props: { post }
+    };
+  });
 }
 
 const { post } = Astro.props;
 const { title, description, date, authors = [] } = post.frontmatter;
+const Content = post.Content;
 const blogUrl = `${SITE_URL}/blog/${Astro.params.slug}/`;
 const frontmatterImage = post.frontmatter.hero_image || post.frontmatter.heroImage || post.frontmatter.image;
 const heroImage = frontmatterImage || extractHeroImage(readFileSync(post.file, 'utf-8'));
@@ -72,7 +75,7 @@ const socialImage = heroImage ? toAbsoluteUrl(heroImage) : undefined;
     <div class="blog-container">
       <article class="blog-article">
         <div class="blog-content">
-          <post.Content />
+          <Content />
         </div>
       </article>
     </div>
