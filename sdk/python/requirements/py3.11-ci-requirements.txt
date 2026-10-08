@@ -1443,6 +1443,7 @@ filelock==3.32.5 \
     # via
     #   datasets
     #   huggingface-hub
+    #   python-discovery
     #   ray
     #   snowflake-connector-python
     #   torch
@@ -2382,6 +2383,7 @@ jupyter-server==2.21.0 \
     --hash=sha256:2ae2e5ce5e97268553e25aebe040197455673d925b5fc7995477153318160cf7 \
     --hash=sha256:70d9a1883f57d3576ea17f4ce061ec1a7aad7ef388d00428cfb7f5e4f0022271
     # via
+    #   feast (setup.py)
     #   jupyter-lsp
     #   jupyterlab
     #   jupyterlab-server
@@ -2391,10 +2393,12 @@ jupyter-server-terminals==0.5.4 \
     --hash=sha256:55be353fc74a80bc7f3b20e6be50a55a61cd525626f578dcb66a5708e2007d14 \
     --hash=sha256:bbda128ed41d0be9020349f9f1f2a4ab9952a73ed5f5ac9f1419794761fb87f5
     # via jupyter-server
-jupyterlab==4.6.3 \
-    --hash=sha256:0a1ebc6567186f1eabd99536e94df7ed9e96d1e7c5ddf3e4406ae16e88abacb7 \
-    --hash=sha256:2e3db6e3a12495ebd188276e985bf5ac502fbde3d1e8628819920210008de498
-    # via notebook
+jupyterlab==4.6.4 \
+    --hash=sha256:15b13f991d3985129c797eb84d9949eeb8b6615e14b444868e642411f2c418b2 \
+    --hash=sha256:404f49b081819378524886c9db66dba57a5565981eff885830df1baba3a17df5
+    # via
+    #   feast (setup.py)
+    #   notebook
 jupyterlab-pygments==0.3.0 \
     --hash=sha256:721aca4d9029252b11cfa9d185e5b5af4d54772bb8072f9b7036f4170054d35d \
     --hash=sha256:841a89020971da1d8693f1a99997aefc5dc424bb1b251fd6322462a1b8842780
@@ -3579,6 +3583,7 @@ packaging==24.2 \
     #   snowflake-connector-python
     #   sphinx
     #   transformers
+    #   virtualenv
     #   wheel
 pandas==2.3.3 \
     --hash=sha256:0242fe9a49aa8b4d78a4fa03acb397a58833ef6199e9aa40a95f027bb3a1b6e7 \
@@ -4888,6 +4893,10 @@ python-dateutil==2.9.0 \
     #   moto
     #   pandas
     #   trino
+python-discovery==1.6.1 \
+    --hash=sha256:cf87d3627dfb4412437fdd5b13eae402607722998d21567993aedbc59b23c15e \
+    --hash=sha256:d43fcdef879fe795352bd13ccf8d185ba5a9f86f36cfcd00529f596e737442b3
+    # via virtualenv
 python-docx==1.2.0 \
     --hash=sha256:3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7 \
     --hash=sha256:7bc9d7b7d8a69c9c02ca09216118c86552704edc23bac179283f2e38f86220ce
@@ -6292,18 +6301,19 @@ torchvision==0.29.0 \
     #   docling-ibm-models
     #   easyocr
     #   timm
-tornado==6.5.8 \
-    --hash=sha256:11881db6b7c168494be2c2d12e65931451bdf7ee718535418ae1d8855dd5a0ee \
-    --hash=sha256:547d63f450d570c14fe0e8db2cfb14c9bbd1c2503b4a6612586267955aa47b58 \
-    --hash=sha256:5d242290bdf7ab3151bc1065fdd75c0dcc21cbc7b49f22a4c56329c2d6566d22 \
-    --hash=sha256:67832909c4779c64942380cb5f044a5c6163d00831472d80e25e115de9917836 \
-    --hash=sha256:68a7468c7e289f8514d7d664101753903217eff1bb6822c6b5994a0b5f5bcb26 \
-    --hash=sha256:7b94ff0e128fe0542f3bd331fb44d06260fc4ac16881545159f34ef08aad4195 \
-    --hash=sha256:7e2360a0ffbe145eca8af0b19cb7203d79b1a98dd4cccdd6b368f6f49c2e3808 \
-    --hash=sha256:9452e1b208a8bd771e2cb1f2ff564985b9b214bdebbe622793e1799e0a6bd23f \
-    --hash=sha256:9715b5eb79735b2bcd454ce216a9275b7c0470e64ea1bf5742f78b2f72b26eeb \
-    --hash=sha256:cc6aa787d7cfab7c3d35189dc7a56fbd2399a569624c730c6b55b3d6531d0403
+tornado==6.5.10 \
+    --hash=sha256:302eb1e0e3e159314eb591920529fdea80acca92df5510a2cec5bbd4f099ec72 \
+    --hash=sha256:37ae8f150cecfdbf747fc4e12f5e9a97ecd8cf1d4cdb3f119e2de84b11196918 \
+    --hash=sha256:4bd192b959f9128fb99b8898148070ba4574c9589b78bce42d1851131fe85828 \
+    --hash=sha256:66aaa3f57d30c6e6becee83ff28055d5930ac724214bde99393eefda83d5e015 \
+    --hash=sha256:69acca6501eed74582b76dbbceee2a91613f54728e3e418346000d7103101676 \
+    --hash=sha256:83e6cf438b106c6b3852d70960967bb1b70c87438050dca0981e4b9aa751a4c1 \
+    --hash=sha256:9261783640e23258694a9ff0795df430a5a7b0a651d3dd53dd0969ad6be16da7 \
+    --hash=sha256:a6b1ccd08c04b4a06fb5aeb381be99de5ad1e5375c1785e31d78c880feb57687 \
+    --hash=sha256:bdf942448169e5336451d0494d7e3d81cfa726d5aa312affdc4682dd62a62f6d \
+    --hash=sha256:ce045d3c298fddd30e89a2777f97039d1b641eb9518ac7b26a4721903539c694
     # via
+    #   feast (setup.py)
     #   ipykernel
     #   jupyter-client
     #   jupyter-server
@@ -6777,9 +6787,9 @@ uvloop==0.22.1 \
     --hash=sha256:ef6f0d4cc8a9fa1f6a910230cd53545d9a14479311e87e3cb225495952eb672c \
     --hash=sha256:fe94b4564e865d968414598eea1a6de60adba0c040ba4ed05ac1300de402cd42
     # via uvicorn
-virtualenv==20.23.0 \
-    --hash=sha256:6abec7670e5802a528357fdc75b26b9f57d5d92f29c5462ba0fbe45feacc685e \
-    --hash=sha256:a85caa554ced0c0afbd0d638e7e2d7b5f92d23478d05d17a76daeac8f279f924
+virtualenv==21.14.5 \
+    --hash=sha256:b0651e0174982bba17cc6f0aaa2ef496730cb85a3f35eb5d1119d1c904f7d1da \
+    --hash=sha256:c4cb6c13e46b57225a999c7e22a09b163393878facc7ac4c059a57f46faa1647
     # via
     #   feast (setup.py)
     #   pre-commit
