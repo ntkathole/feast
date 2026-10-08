@@ -153,7 +153,7 @@ DUCKDB_REQUIRED = ["ibis-framework[duckdb]>=9.0.0,<10"]
 
 DELTA_REQUIRED = ["deltalake<1.0.0"]
 
-DOCLING_REQUIRED = ["docling>=2.23.0"]
+DOCLING_REQUIRED = ["docling==2.134.0"]
 
 ELASTICSEARCH_REQUIRED = ["elasticsearch>=8.13.0"]
 
@@ -211,7 +211,7 @@ CI_REQUIRED = (
         "grpcio-tools>=1.56.2,<=1.62.3",
         "grpcio-testing>=1.56.2,<=1.62.3",
         # FastAPI does not correctly pull starlette dependency on httpx see thread(https://github.com/tiangolo/fastapi/issues/5656).
-        "httpx==0.27.2",
+        "httpx>=0.28.1,<1",
         "minio==7.2.11",
         "mock==2.0.0",
         "moto==4.2.14",
@@ -275,7 +275,6 @@ CI_REQUIRED = (
     + TORCH_REQUIRED
     + CLICKHOUSE_REQUIRED
     + MCP_REQUIRED
-    + RAG_REQUIRED
     + IMAGE_REQUIRED
     + RAY_REQUIRED
 )
