@@ -21,9 +21,14 @@ dependencies = [
     "protobuf>=4.24.0",
     "Jinja2>=2,<4",
     "mmh3",
-    "numpy>=2.0.0,<3",
+    # Cap at 2.5.0: Konflux ppc64le uses the RH-indexed wheel in
+    # requirements-ppc64le2.txt; newer PyPI releases are sdist-only on Power
+    # and fail offline builds (missing ninja build backend).
+    "numpy>=2.0.0,<=2.5.0",
     "pandas>=1.4.3,<3",
-    "pyarrow>=16.1.0",
+    # Cap at 24.0.0: lock refresh to 25.0.1 made Hermeto prefetch large
+    # Windows wheels via the cluster PyPI proxy (flaky FetchError).
+    "pyarrow>=16.1.0,<=24.0.0",
     "pydantic>=2.10.6",
     "pygments>=2.12.0,<3",
     "PyYAML>=5.4.0,<7",
@@ -43,7 +48,9 @@ dependencies = [
     "prometheus_client>=0.20.0,<0.25.0",
     "psutil",
     "bigtree>=0.19.2",
-    "pyjwt",
+    "pyasn1>=0.6.4",
+    "pyjwt>=2.13.0",
+    "aiohttp>=3.14.3",
     "anyio>=4.14.2",
 ]
 
@@ -63,8 +70,10 @@ cassandra = ["cassandra-driver>=3.26.0,<4"]
 clickhouse = ["clickhouse-connect>=0.7.19"]
 couchbase = ["couchbase==4.3.2", "couchbase-columnar==1.0.0"]
 delta = ["deltalake<1.0.0"]
-docling = ["docling==2.27.0"]
-duckdb = ["ibis-framework[duckdb]>=10.0.0"]
+docling = ["docling==2.134.0"]
+# Cap duckdb at 1.5.4: 1.5.6 is sdist-only on ppc64le and needs cmake>=3.29
+# during offline Konflux installs (not in hermeto prefetch).
+duckdb = ["ibis-framework[duckdb]>=10.0.0", "duckdb<=1.5.4"]
 elasticsearch = ["elasticsearch>=8.13.0"]
 faiss = ["faiss-cpu>=1.7.0,<=1.10.0"]
 flink = ["apache-flink>=2.2.1,<3", "pyarrow<21.0.0"]
@@ -76,14 +85,17 @@ gcp = [
     "google-cloud-datastore>=2.16.0,<3",
     "google-cloud-storage>=1.34.0,<3",
     "google-cloud-bigtable>=2.11.0,<3",
+    # Cap: 1.9.0 sdist-only on Power; RH wheel is 1.8.0.
+    "google-crc32c<=1.8.0",
     "fsspec>=2024.1.0",
 ]
 ge = ["great_expectations>=0.15.41,<1"]
 go = ["cffi>=1.15.0"]
 grpcio = [
-    "grpcio>=1.56.2",
-    "grpcio-reflection>=1.56.2",
-    "grpcio-health-checking>=1.56.2",
+    # Cap at 1.81.1 to match RH-indexed ppc64le wheel.
+    "grpcio>=1.56.2,<=1.81.1",
+    "grpcio-reflection>=1.56.2,<=1.81.1",
+    "grpcio-health-checking>=1.56.2,<=1.81.1",
 ]
 hazelcast = ["hazelcast-python-client>=5.1"]
 hbase = ["happybase>=1.2.0,<3"]
@@ -100,6 +112,9 @@ image = [
 milvus = [
     "pymilvus>=2.5",
     "milvus-lite>=2.4.12",
+    # Cap: 3.12.0+ is sdist-only on ppc64le; build needs puccinialin (Rust)
+    # which Hermeto can't prefetch.
+    "orjson<=3.11.9",
     "feast[setuptools]"
 ]
 mongodb = [
@@ -166,15 +181,19 @@ test = [
 ci = [
     "feast[test, aws, azure, cassandra, clickhouse, couchbase, delta, docling, duckdb, elasticsearch, faiss, gcp, ge, go, grpcio, hazelcast, hbase, ibis, iceberg, image, k8s, mcp, milvus, mlflow, mongodb, mssql, mysql, openlineage, opentelemetry, oracle, scylladb, spark, trino, postgres, pytorch, qdrant, rag, ray, redis, singlestore, snowflake, sqlite_vec]",
     "build",
-    "virtualenv==20.23.0",
+    "virtualenv==21.14.5",
+    "jupyter-server>=2.21.0",
+    "tornado>=6.5.9",
     "dbt-artifacts-parser",
     "ruff>=0.8.0",
     "mypy-protobuf>=3.1",
-    "grpcio-tools>=1.56.2",
-    "grpcio-testing>=1.56.2",
+    "grpcio-tools>=1.56.2,<=1.81.1",
+    "grpcio-testing>=1.56.2,<=1.81.1",
     # FastAPI does not correctly pull starlette dependency on httpx see thread(https://github.com/tiangolo/fastapi/issues/5656).
-    "httpx==0.27.2",
+    "httpx>=0.28.0,<1",
+    "mistune>=3.2.1",
     "mock==2.0.0",
+    "pyasn1>=0.6.4",
     "moto<5",
     "mypy>=1.4.1,<1.11.3",
     "urllib3>=2.6.3,<3",

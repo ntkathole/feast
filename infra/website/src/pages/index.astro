@@ -3,7 +3,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Navigation from '../components/Navigation.astro';
 import { Code } from 'astro/components';
 
-const posts = await Astro.glob('../../docs/blog/*.md');
+const posts = Object.entries(
+  import.meta.glob('../../docs/blog/*.md', { eager: true })
+).map(([file, mod]) => ({ ...mod, file }));
 const sortedPosts = posts.sort((a, b) => {
   const dateA = new Date(a.frontmatter.date || '2000-01-01');
   const dateB = new Date(b.frontmatter.date || '2000-01-01');

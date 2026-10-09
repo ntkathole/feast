@@ -21,8 +21,9 @@ metadata:
   namespace: rhoai-tenant
 spec:
   timeouts:
-    pipeline: 4h
-    tasks: 3h
+    # Align with rhoai-3.4/2.25: hermetic prefetch needs >2h for large pip wheels.
+    pipeline: 10h
+    tasks: 8h
   params:
   - name: git-url
     value: '{{source_url}}'
