@@ -82,6 +82,41 @@ def test_rest_token_extractor():
     ).is_equal_to(token)
 
 
+def test_rest_token_extractor_forwarded_access_token():
+    """A token forwarded by an authenticating proxy (OpenShift oauth-proxy with
+    --pass-access-token) arrives in the X-Forwarded-Access-Token header as a raw
+    token, and must be accepted when no Authorization header is present."""
+    token_extractor = RestTokenExtractor()
+    request: Request = Mock(spec=Request)
+    token = "abcd"
+
+    request.headers = {"x-forwarded-access-token": token}
+    assertpy.assert_that(
+        token_extractor.extract_access_token(request=request)
+    ).is_equal_to(token)
+
+    # Surrounding whitespace is stripped.
+    request.headers = {"x-forwarded-access-token": f"  {token}  "}
+    assertpy.assert_that(
+        token_extractor.extract_access_token(request=request)
+    ).is_equal_to(token)
+
+
+def test_rest_token_extractor_authorization_takes_precedence():
+    """When both headers are present the standard Authorization header wins so
+    CLI/SDK behavior is unchanged."""
+    token_extractor = RestTokenExtractor()
+    request: Request = Mock(spec=Request)
+
+    request.headers = {
+        "authorization": "Bearer auth-header-token",
+        "x-forwarded-access-token": "forwarded-token",
+    }
+    assertpy.assert_that(
+        token_extractor.extract_access_token(request=request)
+    ).is_equal_to("auth-header-token")
+
+
 def test_grpc_token_extractor():
     token_extractor = GrpcTokenExtractor()
     metadata = {}

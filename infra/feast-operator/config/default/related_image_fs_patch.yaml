@@ -12,3 +12,5 @@ spec:
           value: quay.io/feastdev/feature-server:0.68.0
         - name: RELATED_IMAGE_CRON_JOB
           value: registry.k8s.io/kubectl:v1.35.9
+        - name: RELATED_IMAGE_OAUTH_PROXY
+          value: quay.io/openshift/origin-oauth-proxy:latest

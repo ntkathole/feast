@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from importlib import resources as importlib_resources
 from typing import Any, Dict, List, Optional
 
@@ -48,6 +49,18 @@ def _build_auth_config_json(store: "feast.FeatureStore") -> str:
             config["realm"] = realm
         config["auth_discovery_url"] = discovery_url
         config["client_id"] = auth_cfg.ui_client_id or auth_cfg.client_id or ""
+    elif auth_type == "kubernetes":
+        # With kubernetes auth the UI is expected to run behind an
+        # authenticating reverse proxy (e.g. OpenShift oauth-proxy) that
+        # performs the login and forwards the user's token to the API server.
+        # The SPA therefore does not acquire a token itself; it only needs to
+        # know where to send the browser to (re)authenticate and to sign out.
+        # These are oauth-proxy's standard endpoints and can be overridden via
+        # environment variables for other proxies.
+        config["login_path"] = os.getenv("FEAST_UI_AUTH_LOGIN_PATH", "/oauth/start")
+        config["logout_path"] = os.getenv(
+            "FEAST_UI_AUTH_LOGOUT_PATH", "/oauth/sign_out"
+        )
 
     return json.dumps(config)
 

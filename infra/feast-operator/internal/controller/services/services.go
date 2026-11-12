@@ -215,11 +215,19 @@ func (feast *FeastServices) reconcileServices() error {
 		if err := feast.createRoute(UIFeastType); err != nil {
 			return err
 		}
+		// Provision (or tear down) the oauth-proxy's cluster resources based on
+		// whether the sidecar is required for this UI deployment.
+		if err := feast.reconcileOAuthProxy(); err != nil {
+			return err
+		}
 	} else {
 		if err := feast.removeFeastServiceByType(UIFeastType); err != nil {
 			return err
 		}
 		if err := feast.removeRoute(UIFeastType); err != nil {
+			return err
+		}
+		if err := feast.removeOAuthProxy(); err != nil {
 			return err
 		}
 	}
@@ -557,6 +565,9 @@ func (feast *FeastServices) setContainers(podSpec *corev1.PodSpec) error {
 	}
 	if feast.isUiServer() {
 		feast.setContainer(&podSpec.Containers, UIFeastType, fsYamlB64)
+		if feast.shouldDeployOAuthProxy() {
+			feast.setOAuthProxyContainer(podSpec)
+		}
 	}
 	if feast.isMcpServer() {
 		feast.setContainer(&podSpec.Containers, McpServerFeastType, fsYamlB64)
@@ -715,6 +726,12 @@ func (feast *FeastServices) getVolumeMounts(feastType FeastServiceType) (volumeM
 }
 
 func (feast *FeastServices) setRoute(route *routev1.Route, feastType FeastServiceType) error {
+
+	// When the UI is fronted by the oauth-proxy sidecar, the Route targets the
+	// proxy port and reencrypts to it.
+	if feastType == UIFeastType && feast.shouldDeployOAuthProxy() {
+		return feast.setOAuthProxyRoute(route)
+	}
 
 	svcName := feast.GetFeastServiceName(feastType)
 	route.Labels = feast.getFeastTypeLabels(feastType)
@@ -1058,6 +1075,11 @@ func (feast *FeastServices) setService(svc *corev1.Service, feastType FeastServi
 		svc.Labels = feast.getLineageLabels()
 	} else {
 		svc.Labels = feast.getFeastTypeLabels(feastType)
+	}
+	// When the UI is fronted by the oauth-proxy sidecar, the Service exposes the
+	// proxy (HTTPS on OAuthProxyPort) rather than the UI container directly.
+	if feastType == UIFeastType && feast.shouldDeployOAuthProxy() {
+		return feast.setOAuthProxyService(svc)
 	}
 	if feast.isOpenShiftTls(feastType) {
 		if len(svc.Annotations) == 0 {

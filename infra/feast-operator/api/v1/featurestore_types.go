@@ -505,6 +505,13 @@ type FeatureStoreServices struct {
 	Registry     *Registry     `json:"registry,omitempty"`
 	// Creates a UI server container
 	UI *ServerConfigs `json:"ui,omitempty"`
+	// OAuthProxy tunes the oauth-proxy sidecar that fronts the UI server.
+	// The sidecar is provisioned automatically when the UI is deployed on
+	// OpenShift with kubernetes authorization (it is required for browser
+	// login in that case); this field does NOT control whether it is deployed.
+	// When omitted, defaults apply (image from RELATED_IMAGE_OAUTH_PROXY).
+	// +optional
+	OAuthProxy *OAuthProxyConfigs `json:"oauthProxy,omitempty"`
 	// McpServer deploys a standalone Feast MCP (Model Context Protocol) server container (`feast mcp`). It is separate from the embedded MCP of services.onlineStore.serving.mcp and services.registry.local.server.mcp.
 	// +optional
 	McpServer          *McpServerConfig           `json:"mcpServer,omitempty"`
@@ -924,6 +931,20 @@ type FeatureStoreRef struct {
 	Name string `json:"name"`
 	// Namespace of the FeatureStore
 	Namespace string `json:"namespace,omitempty"`
+}
+
+// OAuthProxyConfigs tunes the oauth-proxy sidecar that fronts the UI server
+// on OpenShift. All fields are optional overrides; the sidecar's enablement is
+// derived from the deployment (OpenShift + UI + kubernetes authz), not from
+// this struct's presence.
+type OAuthProxyConfigs struct {
+	// Image overrides the oauth-proxy container image.
+	// Resolution order: Image → RELATED_IMAGE_OAUTH_PROXY env → built-in default.
+	// +optional
+	Image *string `json:"image,omitempty"`
+	// Resources sets the oauth-proxy container's resource requests/limits.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ServerConfigs creates a server for the feast service, with specified container configurations.

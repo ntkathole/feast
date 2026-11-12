@@ -40,6 +40,11 @@ interface ServerAuthConfig {
   realm?: string;
   client_id?: string;
   auth_discovery_url?: string;
+  // Used by "kubernetes" auth: paths the browser is sent to in order to
+  // (re)authenticate and to sign out, served by the authenticating proxy
+  // (e.g. OpenShift oauth-proxy) that fronts the UI.
+  login_path?: string;
+  logout_path?: string;
 }
 
 function readServerAuthConfig(): ServerAuthConfig | null {
@@ -82,6 +87,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isAuthEnabled, setIsAuthEnabled] = useState(false);
+  // Non-null when auth_type is "kubernetes": the UI is fronted by an
+  // authenticating proxy that owns the login/session, so the SPA never holds a
+  // token — it only needs the paths to (re)authenticate and sign out.
+  const [kubeAuth, setKubeAuth] = useState<{
+    loginPath: string;
+    logoutPath: string;
+  } | null>(null);
   const initStarted = useRef(false);
 
   const syncUser = useCallback((keycloak: Keycloak) => {
@@ -113,6 +125,21 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const initAuth = async () => {
       const config = readServerAuthConfig();
+
+      if (config && config.auth_type === "kubernetes") {
+        // The UI runs behind an authenticating proxy (e.g. OpenShift
+        // oauth-proxy) that performs the login and injects the user's token on
+        // upstream /api requests. The SPA does not construct Keycloak or hold a
+        // token — it just records where to (re)authenticate and sign out, and
+        // renders immediately.
+        setKubeAuth({
+          loginPath: config.login_path || "/oauth/start",
+          logoutPath: config.logout_path || "/oauth/sign_out",
+        });
+        setIsAuthEnabled(true);
+        setIsInitializing(false);
+        return;
+      }
 
       if (!config || config.auth_type !== "oidc") {
         // Auth is disabled — skip Keycloak, render the app immediately
@@ -171,9 +198,14 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => clearInterval(id);
   }, [kc, doRefresh]);
 
-  // Global fetch interceptor: inject auth header on /api/ calls, handle 401
+  // Global fetch interceptor for /api/ calls:
+  //  - OIDC mode (kc): attach the bearer token and refresh+retry on 401.
+  //  - kubernetes mode (kubeAuth): the proxy injects the token, so send the
+  //    request unmodified; a 401 means the proxy session expired, so bounce
+  //    the browser through the proxy login.
   useEffect(() => {
-    if (!kc) return;
+    const isKube = kubeAuth !== null;
+    if (!kc && !isKube) return;
 
     const originalFetch = window.fetch;
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -186,7 +218,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const isApiCall = url.includes("/api/");
 
-      if (isApiCall && kc.authenticated && kc.token) {
+      if (isApiCall && kc && kc.authenticated && kc.token) {
         const mergedHeaders = new Headers(init?.headers);
         if (!mergedHeaders.has("Authorization")) {
           mergedHeaders.set("Authorization", `Bearer ${kc.token}`);
@@ -197,18 +229,23 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       let response = await originalFetch(input, init);
 
       if (response.status === 401 && isApiCall) {
-        console.warn("API returned 401 — attempting token refresh and retry");
-        try {
-          await kc.updateToken(5);
-          syncUser(kc);
-          const retryHeaders = new Headers(init?.headers);
-          retryHeaders.set("Authorization", `Bearer ${kc.token}`);
-          response = await originalFetch(input, {
-            ...init,
-            headers: retryHeaders,
-          });
-        } catch {
-          kc.login();
+        if (kc) {
+          console.warn("API returned 401 — attempting token refresh and retry");
+          try {
+            await kc.updateToken(5);
+            syncUser(kc);
+            const retryHeaders = new Headers(init?.headers);
+            retryHeaders.set("Authorization", `Bearer ${kc.token}`);
+            response = await originalFetch(input, {
+              ...init,
+              headers: retryHeaders,
+            });
+          } catch {
+            kc.login();
+          }
+        } else if (kubeAuth) {
+          console.warn("API returned 401 — redirecting to proxy login");
+          window.location.href = kubeAuth.loginPath;
         }
       }
 
@@ -218,17 +255,23 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       window.fetch = originalFetch;
     };
-  }, [kc, syncUser]);
+  }, [kc, kubeAuth, syncUser]);
 
   const logout = useCallback(() => {
     if (kc) {
       kc.logout({ redirectUri: window.location.origin });
+    } else if (kubeAuth) {
+      // Delegate sign-out to the proxy; it clears the session cookie and
+      // redirects back to the IdP/login.
+      window.location.href = kubeAuth.logoutPath;
     }
-  }, [kc]);
+  }, [kc, kubeAuth]);
 
   const value: AuthContextValue = {
     user,
-    isAuthenticated: !!kc?.authenticated,
+    // In kubernetes mode the proxy only forwards authenticated requests, so by
+    // the time the SPA renders the user is authenticated.
+    isAuthenticated: !!kc?.authenticated || kubeAuth !== null,
     isAuthEnabled,
     isInitializing,
     logout,

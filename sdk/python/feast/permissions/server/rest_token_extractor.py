@@ -24,15 +24,24 @@ class RestTokenExtractor(TokenExtractor):
                 f"The keywork argument 'request' is not of the expected type {Request.__name__}"
             )
 
-        access_token = None
         request = kwargs["request"]
-        if isinstance(request, Request):
-            headers = request.headers
-            for header in headers:
-                if header.lower() == "authorization":
-                    return self._extract_bearer_token(headers[header])
+        headers = request.headers
 
-        if access_token is None:
-            raise AuthenticationError("Missing authorization header")
+        # Prefer the standard Authorization: Bearer header used by CLI/SDK
+        # clients. Starlette headers lookups are case-insensitive.
+        authorization = headers.get("authorization")
+        if authorization:
+            return self._extract_bearer_token(authorization)
 
-        return access_token
+        # Fall back to the token forwarded by an authenticating reverse proxy
+        # (e.g. OpenShift oauth-proxy started with --pass-access-token), which
+        # places the raw user access token in the X-Forwarded-Access-Token
+        # header rather than the Authorization header. This lets a browser UI
+        # sitting behind such a proxy authenticate to the Feast REST API.
+        forwarded_token = headers.get("x-forwarded-access-token")
+        if forwarded_token:
+            return forwarded_token.strip()
+
+        raise AuthenticationError(
+            "Missing authorization header or X-Forwarded-Access-Token header"
+        )

@@ -41,6 +41,59 @@ to subjects using standard Kubernetes `ClusterRoleBinding` or `RoleBinding` reso
 
 **SDK docs**: [Feast RBAC](../../getting-started/architecture/rbac.md)
 
+### Feast UI with Kubernetes auth on OpenShift
+
+Feast servers authenticate every API call with a bearer token (the caller's
+ServiceAccount or user token, validated via `TokenReview`). A browser, however,
+has no way to obtain such a token on its own. On **OpenShift**, where an OAuth
+server is built in, the operator closes this gap automatically: whenever a **UI
+server is deployed with `kubernetes` authorization**, it fronts the UI with an
+[OpenShift `oauth-proxy`](https://github.com/openshift/oauth-proxy) sidecar.
+
+The proxy performs the OpenShift login, keeps the session in an encrypted
+server-side cookie (no token is exposed to the browser), and forwards the signed-in
+user's token to the Feast REST API — which then applies the same Kubernetes RBAC
+roles and `Permission` objects as any other client. There is nothing to enable:
+
+```yaml
+apiVersion: feast.dev/v1
+kind: FeatureStore
+metadata:
+  name: sample-ui
+spec:
+  feastProject: feast_rbac
+  authz:
+    kubernetes: {}      # default; the proxy is wired in automatically on OpenShift
+  services:
+    registry:
+      local:
+        server: {}
+    onlineStore:
+      server: {}
+    offlineStore:
+      server: {}
+    ui: {}              # exposed via a reencrypt Route in front of the proxy
+```
+
+Behind the scenes the operator, when running on OpenShift with `kubernetes` authz
+and a UI server:
+
+- adds the `oauth-proxy` sidecar (TLS-terminated on port 8443 with an OpenShift
+  service serving certificate) and points the UI `Service`/`Route` at it;
+- runs the UI container on plain HTTP on the loopback interface, reachable only
+  through the proxy;
+- generates a cookie-signing `Secret` and binds the Feast `ServiceAccount` to
+  `system:auth-delegator` for the proxy's token/subject access reviews.
+
+Optional overrides (image and resources) are available under `services.oauthProxy`;
+the image also resolves from the operator's `RELATED_IMAGE_OAUTH_PROXY` environment
+variable. This is OpenShift-only today — on vanilla Kubernetes you would instead
+front the UI with your own login proxy (for example `oauth2-proxy` with an OIDC
+provider) or use [OIDC authorization](#oidc-authorization).
+
+> With `oidc` authorization the UI logs in directly through Keycloak and no proxy
+> is added; this sidecar applies only to `kubernetes` authorization.
+
 ---
 
 ## OIDC authorization

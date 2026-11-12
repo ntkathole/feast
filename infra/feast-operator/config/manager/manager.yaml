@@ -79,6 +79,8 @@ spec:
           value: feast:latest
         - name: RELATED_IMAGE_CRON_JOB
           value: registry.k8s.io/kubectl:v1.35.9
+        - name: RELATED_IMAGE_OAUTH_PROXY
+          value: quay.io/openshift/origin-oauth-proxy:latest
         # Injected from params.env via kustomize replacements (ODH/RHOAI overlays).
         # Open Data Hub operator sets this from GatewayConfig when the cluster uses external OIDC.
         - name: OIDC_ISSUER_URL

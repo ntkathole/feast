@@ -141,6 +141,12 @@ func (feast *FeastServices) getTlsConfigs(feastType FeastServiceType) *feastdevv
 	if feastType == McpServerFeastType {
 		return nil
 	}
+	// When the UI is fronted by the oauth-proxy sidecar, the UI container serves
+	// plain HTTP on the loopback interface and the proxy terminates TLS, so the
+	// UI itself must agree on the non-TLS port.
+	if feastType == UIFeastType && feast.shouldDeployOAuthProxy() {
+		return nil
+	}
 	if serviceConfigs := feast.getServerConfigs(feastType); serviceConfigs != nil {
 		return serviceConfigs.TLS
 	}
@@ -166,7 +172,10 @@ func (feast *FeastServices) onlineOpenshiftTls() bool {
 // True if running in an openshift cluster and Tls not configured in the service Spec
 func (feast *FeastServices) uiOpenshiftTls() bool {
 	return isOpenShift &&
-		feast.isUiServer() && feast.Handler.FeatureStore.Spec.Services.UI.TLS == nil
+		feast.isUiServer() && feast.Handler.FeatureStore.Spec.Services.UI.TLS == nil &&
+		// The oauth-proxy sidecar owns TLS termination for the UI; the UI
+		// container stays on plain HTTP behind it.
+		!feast.shouldDeployOAuthProxy()
 }
 
 // True if running in an openshift cluster and Tls not configured in the service Spec

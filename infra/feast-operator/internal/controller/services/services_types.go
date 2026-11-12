@@ -30,6 +30,7 @@ const (
 	stagedFeatureRepoEnvVar   = "FEAST_STAGED_FEATURE_REPO_PATH"
 	feastServerImageVar       = "RELATED_IMAGE_FEATURE_SERVER"
 	cronJobImageVar           = "RELATED_IMAGE_CRON_JOB"
+	oauthProxyImageVar        = "RELATED_IMAGE_OAUTH_PROXY"
 	FeatureStoreYamlCmKey     = "feature_store.yaml"
 	EphemeralPath             = "/feast-data"
 	FeatureRepoDir            = "feature_repo"
@@ -63,6 +64,16 @@ const (
 	tlsPath               = "/tls/"
 	tlsPathCustomCABundle = "/etc/pki/tls/custom-certs/ca-bundle.crt"
 	tlsNameSuffix         = "-tls"
+
+	// oauth-proxy sidecar (OpenShift UI kubernetes auth).
+	DefaultOAuthProxyImage    = "quay.io/openshift/origin-oauth-proxy:latest"
+	OAuthProxyPort            = int32(8443)
+	oauthProxyContainerName   = "oauth-proxy"
+	oauthProxyTLSVolumeName   = "oauth-proxy-tls"
+	oauthProxyTLSMountPath    = "/etc/tls/private"
+	oauthProxyCookieVolume    = "oauth-proxy-cookie-secret"
+	oauthProxyCookieMountPath = "/etc/oauth/cookie"
+	oauthProxyCookieFileName  = "cookie-secret"
 
 	caBundleAnnotation                   = "config.openshift.io/inject-trusted-cabundle"
 	caBundleName                         = "odh-trusted-ca-bundle"

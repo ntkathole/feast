@@ -2689,6 +2689,63 @@ spec:
                       NodeSelector is a selector which must be true for the FeatureStore deployment
                       pods to fit on a node.
                     type: object
+                  oauthProxy:
+                    description: OAuthProxy tunes the oauth-proxy sidecar that fronts
+                      the UI server.
+                    properties:
+                      image:
+                        description: Image overrides the oauth-proxy container image.
+                        type: string
+                      resources:
+                        description: Resources sets the oauth-proxy container's resource
+                          requests/limits.
+                        properties:
+                          claims:
+                            description: |-
+                              Claims lists the names of resources, defined in spec.resourceClaims,
+                              that are used by this container.
+                            items:
+                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name must match the name of one entry in pod.spec.resourceClaims of
+                                    the Pod where this field is used.
+                                  type: string
+                                request:
+                                  description: Request is the name chosen for a request
+                                    in the referenced claim.
+                                  type: string
+                              required:
+                              - name
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: |-
+                              Limits describes the maximum amount of compute resources allowed.
+                              More info: https://kubernetes.
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Requests describes the minimum amount of
+                              compute resources required.
+                            type: object
+                        type: object
+                    type: object
                   offlineStore:
                     description: OfflineStore configures the offline store service
                     properties:
@@ -10027,6 +10084,65 @@ spec:
                         description: |-
                           NodeSelector is a selector which must be true for the FeatureStore deployment
                           pods to fit on a node.
+                        type: object
+                      oauthProxy:
+                        description: OAuthProxy tunes the oauth-proxy sidecar that
+                          fronts the UI server.
+                        properties:
+                          image:
+                            description: Image overrides the oauth-proxy container
+                              image.
+                            type: string
+                          resources:
+                            description: Resources sets the oauth-proxy container's
+                              resource requests/limits.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used.
+                                      type: string
+                                    request:
+                                      description: Request is the name chosen for
+                                        a request in the referenced claim.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                additionalProperties:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.
+                                type: object
+                              requests:
+                                additionalProperties:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                description: Requests describes the minimum amount
+                                  of compute resources required.
+                                type: object
+                            type: object
                         type: object
                       offlineStore:
                         description: OfflineStore configures the offline store service

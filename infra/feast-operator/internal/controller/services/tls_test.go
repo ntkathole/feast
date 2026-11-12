@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 )
 
 // test tls functions directly
@@ -125,6 +126,10 @@ var _ = Describe("TLS Config", func() {
 
 			// all services w/ openshift tls
 			feast.Handler.FeatureStore = minimalFeatureStoreWithAllServers()
+			// Use no_auth so this TLS-focused case isn't altered by the UI
+			// oauth-proxy sidecar (which, under kubernetes authz, owns the UI's
+			// TLS termination). The proxy's effect is covered in oauth_proxy_test.go.
+			feast.Handler.FeatureStore.Spec.AuthzConfig = &feastdevv1.AuthzConfig{NoAuth: ptr.To(true)}
 			err = feast.ApplyDefaults()
 			Expect(err).ToNot(HaveOccurred())
 
@@ -195,6 +200,9 @@ var _ = Describe("TLS Config", func() {
 
 			// registry service w/ tls and in an openshift cluster
 			feast.Handler.FeatureStore = minimalFeatureStore()
+			// no_auth keeps the explicit UI TLS below in effect; with kubernetes
+			// authz the UI oauth-proxy sidecar would own TLS termination instead.
+			feast.Handler.FeatureStore.Spec.AuthzConfig = &feastdevv1.AuthzConfig{NoAuth: ptr.To(true)}
 			feast.Handler.FeatureStore.Spec.Services = &feastdevv1.FeatureStoreServices{
 				OnlineStore: &feastdevv1.OnlineStore{
 					Server: &feastdevv1.ServerConfigs{
@@ -249,6 +257,8 @@ var _ = Describe("TLS Config", func() {
 
 			// all services w/ tls and in an openshift cluster
 			feast.Handler.FeatureStore = minimalFeatureStoreWithAllServers()
+			// no_auth so the UI oauth-proxy sidecar does not override UI TLS here.
+			feast.Handler.FeatureStore.Spec.AuthzConfig = &feastdevv1.AuthzConfig{NoAuth: ptr.To(true)}
 			disable := true
 			feast.Handler.FeatureStore.Spec.Services.OnlineStore = &feastdevv1.OnlineStore{
 				Server: &feastdevv1.ServerConfigs{
