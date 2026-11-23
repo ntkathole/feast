@@ -896,22 +896,14 @@ def get_app(
                     f"{request.to} is not a supported push format. Please specify one of these ['online', 'offline', 'online_and_offline']."
                 )
 
-            from feast.data_source import PushSource
-
-            all_fvs = store.list_feature_views(
-                allow_cache=request.allow_registry_cache
-            ) + store.list_stream_feature_views(
-                allow_cache=request.allow_registry_cache
+            # Resolve the same set of views that store.push() will write to
+            # (feature views, stream feature views, and label views). Using a
+            # narrower match here skipped permission checks for label-view-only
+            # push sources and, when the set was empty, skipped auth entirely
+            # before store.push() ran.
+            fvs_with_push_sources = store._fvs_for_push_source_or_raise(
+                request.push_source_name, request.allow_registry_cache
             )
-            fvs_with_push_sources = {
-                fv
-                for fv in all_fvs
-                if (
-                    fv.stream_source is not None
-                    and isinstance(fv.stream_source, PushSource)
-                    and fv.stream_source.name == request.push_source_name
-                )
-            }
 
             for feature_view in fvs_with_push_sources:
                 assert_permissions(resource=feature_view, actions=actions)

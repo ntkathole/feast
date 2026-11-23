@@ -1,6 +1,5 @@
 import logging
 
-import jwt
 from kubernetes import client, config
 from starlette.authentication import (
     AuthenticationError,
@@ -423,27 +422,3 @@ class KubernetesTokenParser(TokenParser):
             )
 
         return False
-
-
-def _decode_token(access_token: str) -> tuple[str, str]:
-    """
-    The `sub` portion of the decoded token includes the service account name in the format: `system:serviceaccount:NAMESPACE:SA_NAME`
-
-    Returns:
-        str: the namespace name.
-        str: the `ServiceAccount` name.
-    """
-    try:
-        decoded_token = jwt.decode(access_token, options={"verify_signature": False})
-        if "sub" in decoded_token:
-            subject: str = decoded_token["sub"]
-            if len(subject.split(":")) != 4:
-                raise AuthenticationError(
-                    f"Expecting 4 elements separated by : in th subject section, instead of {len(subject.split(':'))}."
-                )
-            _, _, sa_namespace, sa_name = subject.split(":")
-            return (sa_namespace, sa_name)
-        else:
-            raise AuthenticationError("Missing sub section in received token.")
-    except jwt.DecodeError as e:
-        raise AuthenticationError(f"Error decoding JWT token: {e}")
